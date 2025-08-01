@@ -1,0 +1,9 @@
+{
+    "api_keys": {
+        "openai": "your-openai-api-key-here",
+        "anthropic": "your-anthropic-api-key-here",
+        "google": "your-google-api-key-here",
+        "deepseek": "your-deepseek-api-key-here"
+    },
+    "note": "Replace these placeholders with your actual API keys"
+}

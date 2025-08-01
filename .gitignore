@@ -1,0 +1,44 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+.env/
+
+# IDE files
+.idea/
+.vscode/
+*.sublime-*
+
+# Logs
+*.log
+logs/
+
+# Local configuration
+config.json
+.env
+
+# Data files
+data/
+!data/.gitkeep
+!data/uploads/.gitkeep
+!data/reports/.gitkeep
+
+# Mac OS files
+.DS_Store
+
+# Temporary files
+*.tmp
+*.swp
+
+# Test coverage
+.coverage
+htmlcov/

@@ -1,0 +1,1087 @@
+{% extends "base.html" %} {% block title %}Analysis Report - Obify{% endblock %}
+{% block additional_css %}
+<style>
+  .model-card {
+    transition: all 0.3s ease;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+  .model-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06) !important;
+    border-color: rgba(0, 0, 0, 0);
+  }
+  /* Chart tabs styling */
+  #chartTabs .nav-link {
+    color: #212529; /* Dark text for maximum contrast */
+    background-color: #f8f9fa;
+    border-color: #dee2e6 #dee2e6 #fff;
+    padding: 0.75rem 1.25rem;
+    transition: all 0.2s ease;
+  }
+  
+  #chartTabs .nav-link i {
+    color: #212529; /* Ensure icons are dark too */
+  }
+  
+  #chartTabs .nav-link:hover {
+    color: #000000; /* Black on hover for maximum visibility */
+    border-color: #e9ecef #e9ecef #dee2e6;
+    background-color: #e9ecef;
+  }
+  
+  #chartTabs .nav-link.active {
+    color: #000000; /* Black for active state */
+    font-weight: 600;
+    background-color: #fff;
+    border-color: #dee2e6 #dee2e6 #fff;
+    border-bottom: 3px solid var(--primary);
+  }
+  
+  #chartTabs .nav-link.active i {
+    color: var(--primary); /* Only icons get primary color */
+  }
+  
+  .ranking-badge {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: #198754;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    border: 2px solid white;
+  }
+  .chart-container {
+    height: 300px;
+    transition: all 0.3s ease;
+  }
+  .nav-tabs .nav-link {
+    transition: all 0.3s ease;
+    border-radius: 4px 4px 0 0;
+  }
+  .nav-tabs .nav-link:hover:not(.active) {
+    background-color: rgba(0, 123, 255, 0.05);
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-10">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1 class="h3" data-aos="fade-right">AI Model Analysis Report</h1>
+      <div data-aos="fade-left">
+        <button
+          class="btn btn-outline-primary me-2"
+          data-bs-toggle="modal"
+          data-bs-target="#exportModal"
+        >
+          <i class="bi bi-download"></i> Export
+        </button>
+        <a href="{{ url_for('index') }}" class="btn btn-primary">
+          <i class="bi bi-plus-lg"></i> New Analysis
+        </a>
+      </div>
+    </div>
+
+    <!-- Report Overview Card with animation -->
+    <div
+      class="card shadow border-0 rounded-lg mb-4"
+      data-aos="fade-up"
+      data-aos-delay="100"
+    >
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-6">
+            <h5 class="card-title" data-aos="fade-right" data-aos-delay="150">
+              Report Overview
+            </h5>
+            <p class="text-muted">
+              Generated on {{ report.timestamp|replace('T', ' at ')|truncate(19,
+              True, '') }}
+            </p>
+            <p><strong>Source File:</strong> {{ report.source_file }}</p>
+            <p><strong>Models Tested:</strong> {{ report.models|length }}</p>
+          </div>
+          <div class="col-md-6">
+            <h5 class="card-title" data-aos="fade-left" data-aos-delay="150">
+              Recommendations
+            </h5>
+            {% if report.recommendations %}
+            <p>
+              <strong>Best Overall:</strong>
+              <span class="badge bg-success"
+                >{{ report.recommendations.best_overall }}</span
+              >
+            </p>
+            <p>
+              <strong>Best Value:</strong>
+              <span class="badge bg-info"
+                >{{ report.recommendations.best_value }}</span
+              >
+            </p>
+            <p>
+              <strong>Fastest:</strong>
+              <span class="badge bg-warning text-dark"
+                >{{ report.recommendations.fastest }}</span
+              >
+            </p>
+            <p>
+              <strong>Most Accurate:</strong>
+              <span class="badge bg-primary"
+                >{{ report.recommendations.most_accurate }}</span
+              >
+            </p>
+            {% else %}
+            <p class="text-muted">No recommendations available.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="card shadow border-0 rounded-lg mb-4">
+      <div class="card-header bg-primary text-white" data-aos="fade-down">
+        <h5 class="mb-0">Performance Comparison</h5>
+      </div>
+      <div class="card-body">
+        <ul
+          class="nav nav-tabs mb-4"
+          id="chartTabs"
+          role="tablist"
+          data-aos="fade-right"
+          data-aos-delay="100"
+        >
+          <li class="nav-item" role="presentation">
+            <button
+              class="nav-link active fw-semibold"
+              id="cost-tab"
+              data-bs-toggle="tab"
+              data-bs-target="#cost"
+              type="button"
+              role="tab"
+              aria-controls="cost"
+              aria-selected="true"
+            >
+              <i class="bi bi-currency-dollar me-1"></i><span style="color: #000000;">Cost</span>
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button
+              class="nav-link fw-semibold"
+              id="latency-tab"
+              data-bs-toggle="tab"
+              data-bs-target="#latency"
+              type="button"
+              role="tab"
+              aria-controls="latency"
+              aria-selected="false"
+            >
+              <i class="bi bi-stopwatch me-1"></i><span style="color: #000000;">Latency</span>
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button
+              class="nav-link fw-semibold"
+              id="quality-tab"
+              data-bs-toggle="tab"
+              data-bs-target="#quality"
+              type="button"
+              role="tab"
+              aria-controls="quality"
+              aria-selected="false"
+            >
+              <i class="bi bi-award me-1"></i><span style="color: #000000;">Quality</span>
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button
+              class="nav-link fw-semibold"
+              id="success-tab"
+              data-bs-toggle="tab"
+              data-bs-target="#success"
+              type="button"
+              role="tab"
+              aria-controls="success"
+              aria-selected="false"
+            >
+              <i class="bi bi-check-circle me-1"></i><span style="color: #000000;">Success Rate</span>
+            </button>
+          </li>
+        </ul>
+        <div
+          class="tab-content p-4"
+          id="chartTabContent"
+          data-aos="fade-up"
+          data-aos-delay="200"
+        >
+          <div
+            class="tab-pane fade show active"
+            id="cost"
+            role="tabpanel"
+            aria-labelledby="cost-tab"
+          >
+            <div class="chart-container">
+              <canvas id="costChart"></canvas>
+            </div>
+          </div>
+          <div
+            class="tab-pane fade"
+            id="latency"
+            role="tabpanel"
+            aria-labelledby="latency-tab"
+          >
+            <div class="chart-container">
+              <canvas id="latencyChart"></canvas>
+            </div>
+          </div>
+          <div
+            class="tab-pane fade"
+            id="quality"
+            role="tabpanel"
+            aria-labelledby="quality-tab"
+          >
+            <div class="chart-container">
+              <canvas id="qualityChart"></canvas>
+            </div>
+          </div>
+          <div
+            class="tab-pane fade"
+            id="success"
+            role="tabpanel"
+            aria-labelledby="success-tab"
+          >
+            <div class="chart-container">
+              <canvas id="successChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Model Cards -->
+    <h4 class="mb-3" data-aos="fade-up" data-aos-delay="200">
+      Model Performance
+    </h4>
+    <div class="row">
+      {% for model_id, model_data in report.models.items() %}
+      <div
+        class="col-md-4 mb-4"
+        data-aos="zoom-in-up"
+        data-aos-delay="{{ loop.index * 50 + 200 }}"
+      >
+        <div
+          class="card shadow border-0 rounded-lg h-100 model-card position-relative"
+        >
+          {% if report.recommendations and report.recommendations.top_models and
+          model_id in report.recommendations.top_models %}
+          <div
+            class="ranking-badge animate__animated animate__heartBeat animate__delay-1s"
+          >
+            {{ report.recommendations.top_models.index(model_id) + 1 }}
+          </div>
+          {% endif %}
+          <div class="card-header bg-light bg-gradient">
+            <h5 class="mb-0">{{ model_data.model_name }}</h5>
+            <small class="text-muted">{{ model_id }}</small>
+          </div>
+          <div class="card-body">
+            <div class="row mb-3">
+              <div class="col-6">
+                <h6 class="text-muted">Success Rate</h6>
+                <h5>{{ model_data.success_rate }}</h5>
+              </div>
+              <div class="col-6">
+                <h6 class="text-muted">Avg. Latency</h6>
+                <h5>{{ model_data.avg_latency }}</h5>
+              </div>
+            </div>
+            <div class="row mb-3">
+              <div class="col-6">
+                <h6 class="text-muted">Avg. Cost</h6>
+                <h5>{{ model_data.avg_cost }}</h5>
+              </div>
+              <div class="col-6">
+                <h6 class="text-muted">Cost/1000</h6>
+                <h5>{{ model_data.cost_per_1000 }}</h5>
+              </div>
+            </div>
+            <div class="mb-3 token-metrics">
+              <h6 class="text-muted">Token Usage</h6>
+              <div class="d-flex justify-content-between mb-1">
+                <small>Input Tokens:</small>
+                <small
+                  ><strong>{{ model_data.avg_input_tokens|int }}</strong> avg /
+                  {{ model_data.total_input_tokens|int }} total</small
+                >
+              </div>
+              <div class="d-flex justify-content-between mb-1">
+                <small>Output Tokens:</small>
+                <small
+                  ><strong>{{ model_data.avg_output_tokens|int }}</strong> avg /
+                  {{ model_data.total_output_tokens|int }} total</small
+                >
+              </div>
+              <div class="d-flex justify-content-between mb-1">
+                <small>Cost Formula:</small>
+                <small>(Input ÷ 1M × Rate) + (Output ÷ 1M × Rate)</small>
+              </div>
+            </div>
+            <div class="mb-3">
+              <h6 class="text-muted">Quality Metrics</h6>
+              <div class="progress mb-2" style="height: 8px">
+                <div
+                  class="progress-bar"
+                  role="progressbar"
+                  style="width: {{ model_data.quality_metrics.json_validity|replace('%', '')|float }}%;"
+                  aria-valuenow="{{ model_data.quality_metrics.json_validity|replace('%', '')|float }}"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                ></div>
+              </div>
+              <small
+                >JSON Validity: {{ model_data.quality_metrics.json_validity
+                }}</small
+              >
+
+              <div class="progress mb-2" style="height: 8px">
+                <div
+                  class="progress-bar bg-success"
+                  role="progressbar"
+                  style="width: {{ model_data.quality_metrics.format_consistency|replace('%', '')|float }}%;"
+                  aria-valuenow="{{ model_data.quality_metrics.format_consistency|replace('%', '')|float }}"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                ></div>
+              </div>
+              <small
+                >Format Consistency: {{
+                model_data.quality_metrics.format_consistency }}</small
+              >
+
+              <div class="progress mb-2" style="height: 8px">
+                <div
+                  class="progress-bar bg-info"
+                  role="progressbar"
+                  style="width: {{ model_data.quality_metrics.json_structure_consistency|replace('%', '')|float }}%;"
+                  aria-valuenow="{{ model_data.quality_metrics.json_structure_consistency|replace('%', '')|float }}"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                ></div>
+              </div>
+              <small
+                >Structure Consistency: {{
+                model_data.quality_metrics.json_structure_consistency }}</small
+              >
+            </div>
+          </div>
+          <div class="card-footer bg-light">
+            <button
+              class="btn btn-sm btn-outline-primary w-100"
+              data-bs-toggle="modal"
+              data-bs-target="#responseModal-{{ loop.index }}"
+            >
+              <i class="bi bi-eye"></i> View All Responses
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Response Modal -->
+      <div
+        class="modal fade"
+        id="responseModal-{{ loop.index }}"
+        tabindex="-1"
+        aria-labelledby="responseModalLabel-{{ loop.index }}"
+        aria-hidden="true"
+      >
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+          <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-primary bg-gradient text-white">
+              <h5 class="modal-title" id="responseModalLabel-{{ loop.index }}">
+                {{ model_data.model_name }} - All Responses
+              </h5>
+              <button
+                type="button"
+                class="btn-close btn-close-white"
+                data-bs-dismiss="modal"
+                aria-label="Close"
+              ></button>
+            </div>
+            <div class="modal-body">
+              {% if model_id in report.all_responses and
+              report.all_responses[model_id]|length > 0 %}
+              <!-- Review navigation controls -->
+              {% set model_loop_index = loop.index %} {% set total_responses =
+              report.all_responses[model_id]|length %}
+
+              <div
+                class="d-flex justify-content-between align-items-center mb-3 animate__animated animate__fadeIn"
+              >
+                <div>
+                  <h6 class="mb-0">{{ total_responses }} Reviews Available</h6>
+                </div>
+                <div class="d-flex">
+                  <!-- Review pagination controls -->
+                  <div class="btn-group me-2">
+                    <button
+                      class="btn btn-sm btn-outline-primary"
+                      id="prevPage-{{ model_loop_index }}"
+                    >
+                      <i class="bi bi-chevron-left"></i> Previous
+                    </button>
+                    <span
+                      class="btn btn-sm btn-outline-secondary"
+                      id="pageInfo-{{ model_loop_index }}"
+                    >
+                      Page
+                      <span id="currentPage-{{ model_loop_index }}">1</span> of
+                      <span id="totalPages-{{ model_loop_index }}"
+                        >{{ ((total_responses - 1) // 10) + 1 }}</span
+                      >
+                    </span>
+                    <button
+                      class="btn btn-sm btn-outline-primary"
+                      id="nextPage-{{ model_loop_index }}"
+                    >
+                      Next <i class="bi bi-chevron-right"></i>
+                    </button>
+                  </div>
+                  <!-- View selector -->
+                  <div class="btn-group">
+                    <button
+                      class="btn btn-sm btn-outline-primary active"
+                      id="tabView-{{ model_loop_index }}"
+                      data-view="tab"
+                    >
+                      <i class="bi bi-list-ul"></i> Tab View
+                    </button>
+                    <button
+                      class="btn btn-sm btn-outline-primary"
+                      id="cardView-{{ model_loop_index }}"
+                      data-view="card"
+                    >
+                      <i class="bi bi-grid"></i> Card View
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tab navigation -->
+              <ul
+                class="nav nav-tabs mb-3"
+                id="reviewTabs-{{ model_loop_index }}"
+                role="tablist"
+              >
+                {% for response in report.all_responses[model_id] %}
+                <li
+                  class="nav-item review-tab-item"
+                  role="presentation"
+                  data-page="{{ ((loop.index0) // 10) + 1 }}"
+                  style="{% if ((loop.index0) // 10) + 1 != 1 %}display: none;{% endif %}"
+                >
+                  <button
+                    class="nav-link {% if loop.first %}active{% endif %}"
+                    id="review-{{ loop.index }}-tab-{{ model_loop_index }}"
+                    data-bs-toggle="tab"
+                    data-bs-target="#review-{{ loop.index }}-content-{{ model_loop_index }}"
+                    type="button"
+                    role="tab"
+                    aria-controls="review-{{ loop.index }}-content-{{ model_loop_index }}"
+                    aria-selected="{% if loop.first %}true{% else %}false{% endif %}"
+                  >
+                    <span class="badge bg-secondary me-1"
+                      >#{{ response.review_number }}</span
+                    >
+                    {{ response.review_text|truncate(30, true) }}
+                  </button>
+                </li>
+                {% endfor %}
+              </ul>
+
+              <!-- Tab content -->
+              <div
+                class="tab-content"
+                id="reviewTabsContent-{{ model_loop_index }}"
+              >
+                {% for response in report.all_responses[model_id] %}
+                <div
+                  class="tab-pane fade {% if loop.first %}show active{% endif %}"
+                  id="review-{{ loop.index }}-content-{{ model_loop_index }}"
+                  role="tabpanel"
+                  aria-labelledby="review-{{ loop.index }}-tab-{{ model_loop_index }}"
+                  data-page="{{ ((loop.index0) // 10) + 1 }}"
+                >
+                  <!-- Review Text -->
+                  <div class="card mb-3">
+                    <div class="card-header bg-light bg-gradient">
+                      <h6 class="mb-0">Review #{{ response.review_number }}</h6>
+                    </div>
+                    <div class="card-body">
+                      <p>{{ response.review_text }}</p>
+                    </div>
+                  </div>
+
+                  <!-- Prompt Sent -->
+                  <div class="card mb-3">
+                    <div class="card-header bg-light bg-gradient">
+                      <h6 class="mb-0">Prompt Sent to Model</h6>
+                    </div>
+                    <div class="card-body">
+                      <pre
+                        style="white-space: pre-wrap; word-break: break-word"
+                      >
+{{ response.prompt_sent }}</pre
+                      >
+                    </div>
+                  </div>
+
+                  <!-- Model Response -->
+                  <div class="card mb-3">
+                    <div
+                      class="card-header bg-light d-flex justify-content-between align-items-center"
+                    >
+                      <h6 class="mb-0">Model Response</h6>
+                      <span
+                        class="badge {% if response.success %}bg-success{% else %}bg-danger{% endif %}"
+                      >
+                        {% if response.success %}Success{% else %}Failed{% endif
+                        %}
+                      </span>
+                    </div>
+                    <div class="card-body">
+                      <pre
+                        class="language-json"
+                        style="white-space: pre-wrap; word-break: break-word"
+                      ><code>{{ response.response }}</code></pre>
+                    </div>
+                  </div>
+
+                  <!-- Statistics -->
+                  <div class="row">
+                    <div class="col-md-4">
+                      <div class="card mb-3">
+                        <div class="card-body text-center">
+                          <h6 class="text-muted">Tokens</h6>
+                          <h5>{{ response.tokens }}</h5>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <div class="card mb-3">
+                        <div class="card-body text-center">
+                          <h6 class="text-muted">Cost</h6>
+                          <h5>{{ response.cost }}</h5>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <div class="card mb-3">
+                        <div class="card-body text-center">
+                          <h6 class="text-muted">Latency</h6>
+                          <h5>{{ response.latency }}</h5>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+              {% else %}
+              <div class="alert alert-info">
+                No responses available for this model.
+              </div>
+              {% endif %}
+            </div>
+            <div class="modal-footer">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                data-bs-dismiss="modal"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Export Modal -->
+<div
+  class="modal fade"
+  id="exportModal"
+  tabindex="-1"
+  aria-labelledby="exportModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content shadow-lg border-0">
+      <div class="modal-header bg-primary bg-gradient text-white">
+        <h5 class="modal-title" id="exportModalLabel">Export Report</h5>
+        <button
+          type="button"
+          class="btn-close btn-close-white"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-grid gap-3">
+          <a
+            href="{{ url_for('download_report', report_name=report_name) }}"
+            class="btn btn-outline-primary animate__animated animate__fadeInDown"
+          >
+            <i class="bi bi-filetype-json"></i> Export as JSON
+          </a>
+          <a
+            href="{{ url_for('export_report_pdf', report_name=report_name) }}"
+            class="btn btn-outline-danger animate__animated animate__fadeInDown animate__delay-1s"
+          >
+            <i class="bi bi-filetype-pdf"></i> Export as PDF
+          </a>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block additional_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+      // Prepare the data for charts
+      const models = [];
+      const costData = [];
+      const latencyData = [];
+      const successData = [];
+      const jsonValidityData = [];
+      const formatConsistencyData = [];
+      const structureConsistencyData = [];
+
+      {% for model_id, model_data in report.models.items() %}
+          models.push('{{ model_data.model_name }}');
+          {% set cost_value = model_data.cost_per_1000|replace('$', '')|float %}
+          {% if cost_value > 0 %}
+              costData.push({{ cost_value }});
+          {% else %}
+              costData.push(0.00001); // Minimum value to ensure visibility
+          {% endif %}
+          latencyData.push({{ model_data.avg_latency|replace(' seconds', '')|float }});
+          successData.push({{ model_data.success_rate|replace('%', '')|float }});
+          jsonValidityData.push({{ model_data.quality_metrics.json_validity|replace('%', '')|float }});
+          formatConsistencyData.push({{ model_data.quality_metrics.format_consistency|replace('%', '')|float }});
+          structureConsistencyData.push({{ model_data.quality_metrics.json_structure_consistency|replace('%', '')|float }});
+      {% endfor %}
+
+      // Cost Chart
+      const costChart = new Chart(
+          document.getElementById('costChart'),
+          {
+              type: 'bar',
+              data: {
+                  labels: models,
+                  datasets: [{
+                      label: 'Cost per 1000 Reviews (USD)',
+                      data: costData,
+                      backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                      borderColor: 'rgba(54, 162, 235, 1)',
+                      borderWidth: 1
+                  }]
+              },
+              options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                      legend: {
+                          position: 'top',
+                          labels: {
+                              color: '#333333',
+                              font: {
+                                  weight: 'bold'
+                              }
+                          }
+                      },
+                      title: {
+                          display: true,
+                          text: 'Cost Comparison (USD per 1000 Reviews)',
+                          color: '#333333',
+                          font: {
+                              weight: 'bold',
+                              size: 16
+                          }
+                      }
+                  },
+                  scales: {
+                      y: {
+                          beginAtZero: true,
+                          title: {
+                              display: true,
+                              text: 'USD',
+                              color: '#333333',
+                              font: {
+                                  weight: 'bold'
+                              }
+                          },
+                          ticks: {
+                              color: '#333333'
+                          },
+                          grid: {
+                              color: 'rgba(0, 0, 0, 0.1)'
+                          }
+                      },
+                      x: {
+                          ticks: {
+                              color: '#333333'
+                          },
+                          grid: {
+                              color: 'rgba(0, 0, 0, 0.1)'
+                          }
+                      }
+                  }
+              }
+          }
+      );
+
+      // Latency Chart
+      const latencyChart = new Chart(
+          document.getElementById('latencyChart'),
+          {
+              type: 'bar',
+              data: {
+                  labels: models,
+                  datasets: [{
+                      label: 'Average Response Time (seconds)',
+                      data: latencyData,
+                      backgroundColor: 'rgba(255, 159, 64, 0.7)',
+                      borderColor: 'rgba(255, 159, 64, 1)',
+                      borderWidth: 1
+                  }]
+              },
+              options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                      legend: {
+                          position: 'top',
+                          labels: {
+                              color: '#333333',
+                              font: {
+                                  weight: 'bold'
+                              }
+                          }
+                      },
+                      title: {
+                          display: true,
+                          text: 'Response Time Comparison (seconds)',
+                          color: '#333333',
+                          font: {
+                              weight: 'bold',
+                              size: 16
+                          }
+                      }
+                  },
+                  scales: {
+                      y: {
+                          beginAtZero: true,
+                          title: {
+                              display: true,
+                              text: 'Seconds',
+                              color: '#333333',
+                              font: {
+                                  weight: 'bold'
+                              }
+                          },
+                          ticks: {
+                              color: '#333333'
+                          },
+                          grid: {
+                              color: 'rgba(0, 0, 0, 0.1)'
+                          }
+                      },
+                      x: {
+                          ticks: {
+                              color: '#333333'
+                          },
+                          grid: {
+                              color: 'rgba(0, 0, 0, 0.1)'
+                          }
+                      }
+                  }
+              }
+          }
+      );
+
+      // Success Rate Chart
+      const successChart = new Chart(
+          document.getElementById('successChart'),
+          {
+              type: 'bar',
+              data: {
+                  labels: models,
+                  datasets: [{
+                      label: 'Success Rate (%)',
+                      data: successData,
+                      backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                      borderColor: 'rgba(75, 192, 192, 1)',
+                      borderWidth: 1
+                  }]
+              },
+              options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                      legend: {
+                          position: 'top',
+                          labels: {
+                              color: '#333333',
+                              font: {
+                                  weight: 'bold'
+                              }
+                          }
+                      },
+                      title: {
+                          display: true,
+                          text: 'Success Rate Comparison (%)',
+                          color: '#333333',
+                          font: {
+                              weight: 'bold',
+                              size: 16
+                          }
+                      }
+                  },
+                  scales: {
+                      y: {
+                          beginAtZero: true,
+                          max: 100,
+                          title: {
+                              display: true,
+                              text: 'Percentage',
+                              color: '#333333',
+                              font: {
+                                  weight: 'bold'
+                              }
+                          },
+                          ticks: {
+                              color: '#333333'
+                          },
+                          grid: {
+                              color: 'rgba(0, 0, 0, 0.1)'
+                          }
+                      },
+                      x: {
+                          ticks: {
+                              color: '#333333'
+                          },
+                          grid: {
+                              color: 'rgba(0, 0, 0, 0.1)'
+                          }
+                      }
+                  }
+              }
+          }
+      );
+
+      // Quality Metrics Chart
+      const qualityChart = new Chart(
+          document.getElementById('qualityChart'),
+          {
+              type: 'radar',
+              data: {
+                  labels: models,
+                  datasets: [
+                      {
+                          label: 'JSON Validity',
+                          data: jsonValidityData,
+                          backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                          borderColor: 'rgba(54, 162, 235, 1)',
+                          pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+                          pointBorderColor: '#fff',
+                          pointHoverBackgroundColor: '#fff',
+                          pointHoverBorderColor: 'rgba(54, 162, 235, 1)'
+                      },
+                      {
+                          label: 'Format Consistency',
+                          data: formatConsistencyData,
+                          backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                          borderColor: 'rgba(255, 99, 132, 1)',
+                          pointBackgroundColor: 'rgba(255, 99, 132, 1)',
+                          pointBorderColor: '#fff',
+                          pointHoverBackgroundColor: '#fff',
+                          pointHoverBorderColor: 'rgba(255, 99, 132, 1)'
+                      },
+                      {
+                          label: 'Structure Consistency',
+                          data: structureConsistencyData,
+                          backgroundColor: 'rgba(255, 206, 86, 0.2)',
+                          borderColor: 'rgba(255, 206, 86, 1)',
+                          pointBackgroundColor: 'rgba(255, 206, 86, 1)',
+                          pointBorderColor: '#fff',
+                          pointHoverBackgroundColor: '#fff',
+                          pointHoverBorderColor: 'rgba(255, 206, 86, 1)'
+                      }
+                  ]
+              },
+              options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                      legend: {
+                          position: 'top',
+                          labels: {
+                              color: '#333333',
+                              font: {
+                                  weight: 'bold'
+                              }
+                          }
+                      },
+                      title: {
+                          display: true,
+                          text: 'Quality Metrics Comparison',
+                          color: '#333333',
+                          font: {
+                              weight: 'bold',
+                              size: 16
+                          }
+                      }
+                  },
+                  scales: {
+                      r: {
+                          min: 0,
+                          max: 100,
+                          ticks: {
+                              color: '#333333'
+                          },
+                          grid: {
+                              color: 'rgba(0, 0, 0, 0.1)'
+                          }
+                      }
+                  }
+              }
+          }
+      );
+  });
+
+  // Review Pagination and View Switching Functions
+  document.addEventListener('DOMContentLoaded', function() {
+      // For each model's review section
+      {% for model_id, model_data in report.models.items() %}
+      {% if model_id in report.all_responses and report.all_responses[model_id]|length > 0 %}
+      (function() {
+          const modelIndex = {{ loop.index }};
+          const totalReviews = {{ report.all_responses[model_id]|length }};
+          const totalPages = Math.ceil(totalReviews / 10);
+          let currentPage = 1;
+
+          // Get UI elements
+          const prevButton = document.getElementById(`prevPage-${modelIndex}`);
+          const nextButton = document.getElementById(`nextPage-${modelIndex}`);
+          const currentPageEl = document.getElementById(`currentPage-${modelIndex}`);
+          const tabViewButton = document.getElementById(`tabView-${modelIndex}`);
+          const cardViewButton = document.getElementById(`cardView-${modelIndex}`);
+
+          // Get review elements
+          const reviewTabs = document.querySelectorAll(`#reviewTabs-${modelIndex} .review-tab-item`);
+          const reviewContents = document.querySelectorAll(`#reviewTabsContent-${modelIndex} .tab-pane`);
+
+          // Pagination functions
+          function updatePage(newPage) {
+              // Validate page number
+              if (newPage < 1 || newPage > totalPages) return;
+
+              currentPage = newPage;
+              currentPageEl.textContent = currentPage;
+
+              // Update UI based on page
+              reviewTabs.forEach(tab => {
+                  const tabPage = parseInt(tab.dataset.page);
+                  tab.style.display = (tabPage === currentPage) ? '' : 'none';
+              });
+
+              // For tab view, activate the first tab of the new page
+              if (tabViewButton.classList.contains('active')) {
+                  const firstTabOnPage = Array.from(reviewTabs).find(tab =>
+                      parseInt(tab.dataset.page) === currentPage);
+
+                  if (firstTabOnPage) {
+                      const firstButton = firstTabOnPage.querySelector('button');
+                      if (firstButton) firstButton.click();
+                  }
+              }
+
+              // For card view, show/hide based on page
+              if (cardViewButton.classList.contains('active')) {
+                  reviewContents.forEach(content => {
+                      const contentPage = parseInt(content.dataset.page);
+                      content.classList.remove('show', 'active');
+                      if (contentPage === currentPage) {
+                          content.classList.add('show', 'active');
+                      }
+                  });
+              }
+
+              // Update button states
+              prevButton.disabled = currentPage === 1;
+              nextButton.disabled = currentPage === totalPages;
+          }
+
+          // View switching functions
+          function switchToTabView() {
+              tabViewButton.classList.add('active');
+              cardViewButton.classList.remove('active');
+
+              // Display tabs and hide content that's not selected
+              document.getElementById(`reviewTabs-${modelIndex}`).style.display = '';
+              reviewContents.forEach(content => {
+                  content.classList.remove('show', 'active');
+              });
+
+              // Activate the first tab on the current page
+              const firstTabOnPage = Array.from(reviewTabs).find(tab =>
+                  parseInt(tab.dataset.page) === currentPage && tab.style.display !== 'none');
+
+              if (firstTabOnPage) {
+                  const firstButton = firstTabOnPage.querySelector('button');
+                  if (firstButton) firstButton.click();
+              }
+          }
+
+          function switchToCardView() {
+              tabViewButton.classList.remove('active');
+              cardViewButton.classList.add('active');
+
+              // Hide tabs and show all content on the current page
+              document.getElementById(`reviewTabs-${modelIndex}`).style.display = 'none';
+              reviewContents.forEach(content => {
+                  const contentPage = parseInt(content.dataset.page);
+                  content.classList.remove('show', 'active');
+                  if (contentPage === currentPage) {
+                      content.classList.add('show', 'active');
+                  }
+              });
+          }
+
+          // Attach event listeners
+          prevButton.addEventListener('click', () => updatePage(currentPage - 1));
+          nextButton.addEventListener('click', () => updatePage(currentPage + 1));
+          tabViewButton.addEventListener('click', switchToTabView);
+          cardViewButton.addEventListener('click', switchToCardView);
+
+          // Initialize
+          updatePage(1);
+      })();
+      {% endif %}
+      {% endfor %}
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,376 @@
+{% extends "base.html" %} {% block title %}Obify - AI Model Comparison
+Platform{% endblock %} {% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-10">
+    <div class="card shadow border-0 rounded-lg mb-5 elevated-card">
+      <div class="card-body p-md-5 p-4">
+        <h1 class="text-center mb-3" data-aos="fade-up">
+          <span class="text-primary fw-bold">Obi</span
+          ><span class="fw-light">fy</span>
+        </h1>
+        <p
+          class="text-center text-muted mb-5 lead"
+          data-aos="fade-up"
+          data-aos-delay="100"
+        >
+          Enterprise-grade AI model performance comparison for review analysis
+          with <span class="text-primary fw-medium">precision</span> and
+          <span class="text-primary fw-medium">confidence</span>
+        </p>
+
+        <div class="row mb-5" data-aos="fade-up" data-aos-delay="200">
+          <div class="col-lg-4 col-md-6 text-center mb-4 mb-lg-0">
+            <div class="feature-icon mb-4">
+              <i class="bi bi-cloud-upload"></i>
+            </div>
+            <h5 class="fw-bold mb-3">Data Integration</h5>
+            <p class="text-muted">
+              Import customer reviews from CSV, TXT, or Excel (.xls, .xlsx) with
+              intelligent column detection
+            </p>
+          </div>
+          <div class="col-lg-4 col-md-6 text-center mb-4 mb-lg-0">
+            <div class="feature-icon mb-4">
+              <i class="bi bi-cpu"></i>
+            </div>
+            <h5 class="fw-bold mb-3">Multi-Model Analysis</h5>
+            <p class="text-muted">
+              Evaluate performance metrics across multiple AI language models
+              with side-by-side comparison
+            </p>
+          </div>
+          <div class="col-lg-4 col-md-6 text-center mx-auto">
+            <div class="feature-icon mb-4">
+              <i class="bi bi-graph-up"></i>
+            </div>
+            <h5 class="fw-bold mb-3">Enterprise Reporting</h5>
+            <p class="text-muted">
+              Generate comprehensive analytics on cost efficiency, response
+              quality, and performance metrics
+            </p>
+          </div>
+        </div>
+
+        <!-- File Upload Section -->
+        <div
+          class="upload-card card border-0 rounded-lg"
+          data-aos="zoom-in-up"
+          data-aos-delay="300"
+        >
+          <div class="card-header">
+            <h5 class="mb-0 d-flex align-items-center">
+              <i class="bi bi-cloud-arrow-up me-2"></i>
+              Data Import
+            </h5>
+          </div>
+          <div class="card-body p-4">
+            <form
+              action="{{ url_for('upload_file') }}"
+              method="post"
+              enctype="multipart/form-data"
+            >
+              <div class="mb-4">
+                <label for="fileUpload" class="form-label fw-bold"
+                  >Select data source file for analysis</label
+                >
+
+                <div class="alert alert-light border mb-4" role="alert">
+                  <div class="d-flex">
+                    <div class="me-3 text-primary">
+                      <i class="bi bi-lightbulb-fill fs-4"></i>
+                    </div>
+                    <div>
+                      <h6 class="mb-2">Intelligent Column Detection</h6>
+                      <p class="mb-2">
+                        Obify automatically analyzes uploaded data and:
+                      </p>
+                      <ul class="mb-0">
+                        <li>
+                          Identifies multiple columns and prompts for review
+                          selection
+                        </li>
+                        <li>
+                          Auto-selects single column files for immediate
+                          processing
+                        </li>
+                        <li>
+                          Supports CSV, TXT, and Excel (.xls, .xlsx) formats
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  id="uploadArea"
+                  class="upload-container p-5 border-dashed rounded-4 bg-light position-relative"
+                  data-aos="fade-up"
+                  data-aos-delay="100"
+                >
+                  <div class="upload-overlay"></div>
+                  <div id="uploadPreview" class="text-center">
+                    <i
+                      class="bi bi-cloud-arrow-up-fill display-4 text-primary mb-3"
+                    ></i>
+                    <h5 class="mb-3 fw-normal">
+                      Drag files here or click to browse
+                    </h5>
+                    <div class="form-text mt-3">
+                      <i class="bi bi-shield-check"></i> Secure processing ·
+                      Maximum file size: 16MB
+                    </div>
+                  </div>
+                  <input
+                    type="file"
+                    id="fileUpload"
+                    name="file"
+                    accept=".csv,.txt,.xlsx,.xls"
+                    style="
+                      position: absolute;
+                      top: 0;
+                      left: 0;
+                      width: 100%;
+                      height: 100%;
+                      opacity: 0;
+                      cursor: pointer;
+                      z-index: 10;
+                    "
+                    required
+                  />
+                </div>
+              </div>
+
+              <div class="d-grid" data-aos="fade-up" data-aos-delay="150">
+                <button type="submit" class="btn btn-primary btn-lg">
+                  <i class="bi bi-arrow-right-circle me-2"></i> Continue to
+                  Analysis
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="feature-card card border-0 rounded-lg"
+      data-aos="zoom-in-up"
+      data-aos-delay="400"
+    >
+      <div class="card-header">
+        <h5 class="mb-0 d-flex align-items-center">
+          <i class="bi bi-stars me-2"></i>
+          Enterprise Advantages
+        </h5>
+      </div>
+      <div class="card-body p-4">
+        <div class="row">
+          <div class="col-lg-6 mb-4">
+            <div class="feature-item p-4 rounded-4 h-100">
+              <div class="d-flex align-items-center mb-3">
+                <div class="feature-icon-small me-3">
+                  <i class="bi bi-stack"></i>
+                </div>
+                <h6 class="fw-bold mb-0">Multi-Model Intelligence</h6>
+              </div>
+              <p class="text-muted mb-0">
+                Simultaneously evaluate multiple AI language models to identify
+                optimal performance characteristics for your specific business
+                requirements
+              </p>
+            </div>
+          </div>
+          <div class="col-lg-6 mb-4">
+            <div class="feature-item p-4 rounded-4 h-100">
+              <div class="d-flex align-items-center mb-3">
+                <div class="feature-icon-small me-3">
+                  <i class="bi bi-graph-up-arrow"></i>
+                </div>
+                <h6 class="fw-bold mb-0">ROI Optimization</h6>
+              </div>
+              <p class="text-muted mb-0">
+                Advanced cost analytics to maximize return on investment across
+                different AI model pricing tiers and performance characteristics
+              </p>
+            </div>
+          </div>
+          <div class="col-lg-6 mb-4 mb-lg-0">
+            <div class="feature-item p-4 rounded-4 h-100">
+              <div class="d-flex align-items-center mb-3">
+                <div class="feature-icon-small me-3">
+                  <i class="bi bi-shield-check"></i>
+                </div>
+                <h6 class="fw-bold mb-0">Quality Assurance</h6>
+              </div>
+              <p class="text-muted mb-0">
+                Comprehensive evaluation metrics for response quality, format
+                consistency, and semantic accuracy across all tested models
+              </p>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="feature-item p-4 rounded-4 h-100">
+              <div class="d-flex align-items-center mb-3">
+                <div class="feature-icon-small me-3">
+                  <i class="bi bi-file-earmark-bar-graph"></i>
+                </div>
+                <h6 class="fw-bold mb-0">Advanced Analytics</h6>
+              </div>
+              <p class="text-muted mb-0">
+                Interactive data visualizations and exportable reports with
+                detailed performance metrics for executive decision-making
+              </p>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <h6>
+              <i class="bi bi-check-circle-fill text-success me-2"></i>
+              Customizable Prompts
+            </h6>
+            <p class="text-muted">
+              Fine-tune prompts to optimize AI responses for your specific needs
+            </p>
+          </div>
+          <div class="col-md-6">
+            <h6>
+              <i class="bi bi-check-circle-fill text-success me-2"></i> Scalable
+              Processing
+            </h6>
+            <p class="text-muted">
+              Handle large volumes of reviews with efficient parallel processing
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block additional_css %}
+<style>
+  .elevated-card {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  }
+
+  .border-dashed {
+    border: 2px dashed var(--gray-300);
+    transition: all 0.3s ease;
+  }
+
+  .border-dashed:hover {
+    border-color: var(--primary);
+  }
+
+  .upload-container {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    position: relative;
+  }
+
+  .upload-container:hover {
+    background-color: var(--gray-50) !important;
+    transform: translateY(-2px);
+  }
+
+  .custom-file-input {
+    cursor: pointer;
+    opacity: 0;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+  }
+
+  .upload-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 0.5rem;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .upload-container:hover .upload-overlay {
+    background: radial-gradient(
+      circle at center,
+      rgba(11, 61, 145, 0.03) 0%,
+      transparent 70%
+    );
+  }
+
+  .feature-icon-small {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    color: white;
+    font-size: 1.2rem;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    box-shadow: 0 4px 10px rgba(11, 61, 145, 0.2);
+  }
+
+  .feature-item {
+    border: 1px solid var(--gray-200);
+    transition: all 0.3s ease;
+    background: white;
+  }
+
+  .feature-item:hover {
+    border-color: var(--gray-300);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    transform: translateY(-3px);
+  }
+
+  .upload-card,
+  .feature-card {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  }
+</style>
+{% endblock %} {% block additional_js %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    // Initialize AOS with more professional settings
+    AOS.init({
+      duration: 800,
+      once: true,
+      offset: 100,
+      easing: "ease-out-cubic",
+    });
+
+    // Enhance file upload experience
+    const fileInput = document.getElementById("fileUpload");
+    const uploadContainer = document.querySelector(".upload-container");
+
+    if (fileInput && uploadContainer) {
+      fileInput.addEventListener("change", function () {
+        if (fileInput.files.length > 0) {
+          const fileName = fileInput.files[0].name;
+          const fileSize = (fileInput.files[0].size / (1024 * 1024)).toFixed(2);
+
+          // Update UI to show selected file
+          const iconElement = uploadContainer.querySelector(".bi");
+          if (iconElement) {
+            iconElement.classList.remove("bi-cloud-arrow-up-fill");
+            iconElement.classList.add("bi-file-earmark-text-fill");
+          }
+
+          const titleElement = uploadContainer.querySelector("h5");
+          if (titleElement) {
+            titleElement.innerHTML = `${fileName} <span class="text-muted">(${fileSize} MB)</span>`;
+          }
+
+          // Add selected state styling
+          uploadContainer.classList.add("border-primary");
+          uploadContainer.classList.remove("border-dashed");
+        }
+      });
+    }
+  });
+</script>
+{% endblock %}

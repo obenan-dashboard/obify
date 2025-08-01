@@ -1,0 +1,646 @@
+{% extends "base.html" %}
+
+{% block title %}Configure Test - Obify{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card shadow border-0 rounded-lg mb-4">
+            <div class="card-header" data-aos="fade-down">
+                <h5 class="mb-0 d-flex align-items-center">
+                    <i class="bi bi-sliders me-2"></i>
+                    Analysis Configuration
+                </h5>
+            </div>
+            <div class="card-body p-md-4 p-3">
+                <form action="{{ url_for('run_test') }}" method="post" id="configForm">
+                    <input type="hidden" name="timestamp" value="{{ timestamp }}">
+                    
+                    <div class="mb-5" data-aos="fade-up" data-aos-delay="100">
+                        <h5 class="d-flex align-items-center mb-3">
+                            <i class="bi bi-database-fill me-2 text-primary"></i>
+                            <span>Source Data</span>
+                            <span class="badge ms-2 bg-primary-subtle text-primary">{{ total_reviews }} Reviews</span>
+                        </h5>
+                        
+                        <div class="data-source-card p-3 rounded-4 shadow-sm mb-4" data-aos="fade-right" data-aos-delay="150">
+                            <div class="row align-items-center">
+                                <div class="col-md-8 mb-3 mb-md-0">
+                                    <div class="d-flex align-items-center">
+                                        <div class="file-icon rounded-circle p-2 me-3">
+                                            <i class="bi bi-file-earmark-spreadsheet-fill fs-4"></i>
+                                        </div>
+                                        <div>
+                                            <h6 class="mb-1 fw-semibold">{{ original_filename }}</h6>
+                                            <div class="text-secondary d-flex align-items-center">
+                                                <i class="bi bi-table me-1"></i>
+                                                Data from column: <span class="badge ms-1 bg-secondary-subtle text-secondary">{{ selected_column }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="d-flex justify-content-md-end align-items-center">
+                                        <div class="data-metrics me-3 text-center">
+                                            <div class="h3 mb-0 fw-bold">{{ total_reviews }}</div>
+                                            <div class="small text-secondary">Reviews</div>
+                                        </div>
+                                        <div class="data-metrics text-center">
+                                            <div class="h3 mb-0 fw-bold">{{ models|length }}</div>
+                                            <div class="small text-secondary">Models</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="data-review-card shadow-sm border-0 rounded-4 overflow-hidden">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-card-text me-2"></i>
+                                    <span>Review Data</span>
+                                </div>
+                                <div class="review-actions">
+                                    <button type="button" class="btn btn-sm btn-outline-primary review-action-btn" data-bs-toggle="tooltip" title="View insights">
+                                        <i class="bi bi-lightning"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary review-action-btn ms-1" data-bs-toggle="tooltip" title="Export data">
+                                        <i class="bi bi-download"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="p-0">
+                                <!-- Review navigation controls -->
+                                <div class="p-3 border-bottom d-flex justify-content-between align-items-center" data-aos="fade-right" data-aos-delay="150">
+                                    <div class="search-box position-relative">
+                                        <i class="bi bi-search position-absolute search-icon"></i>
+                                        <input type="search" class="form-control form-control-sm search-input" id="reviewSearch" placeholder="Search reviews..." onkeydown="if(event.key === 'Enter') event.preventDefault()">
+                                    </div>
+                                    <div class="pagination-controls d-flex align-items-center">
+                                        <span class="me-2 text-secondary small">
+                                            <span id="reviewDisplayCount">1-10</span> of {{ total_reviews }}
+                                        </span>
+                                        <div class="pagination-buttons">
+                                            <button type="button" class="btn btn-sm btn-icon" id="prevPage">
+                                                <i class="bi bi-chevron-left"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-icon" id="nextPage">
+                                                <i class="bi bi-chevron-right"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Scrollable review container -->
+                                <div class="review-container" style="max-height: 400px; overflow-y: auto; scroll-behavior: smooth;">
+                                    <div class="list-group list-group-flush" id="reviewList">
+                                        {% for review in all_reviews %}
+                                        <div class="list-group-item review-item" data-page="{{ ((loop.index0) // 10) + 1 }}" style="{% if ((loop.index0) // 10) + 1 != 1 %}display: none;{% endif %}">
+                                            <div class="d-flex w-100 justify-content-between mb-1">
+                                                <h6 class="mb-1 d-flex align-items-center">
+                                                    <span class="badge bg-secondary me-2">#{{ loop.index }}</span>
+                                                    <span class="review-title">Review</span>
+                                                </h6>
+                                                <small class="text-muted">{{ ((review|length) // 5) + 1 }} tokens</small>
+                                            </div>
+                                            <p class="mb-1 review-text">{{ review }}</p>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-5" data-aos="fade-up" data-aos-delay="200">
+                        <h5 class="d-flex align-items-center mb-3">
+                            <i class="bi bi-cpu-fill me-2 text-primary"></i>
+                            <span>AI Model Selection</span>
+                        </h5>
+                        <p class="text-secondary mb-4">Select one or more AI models to evaluate in your comparison analysis.</p>
+                        
+                        <div class="row model-selection-container">
+                            {% for provider, provider_models in models.items() %}
+                            <div class="col-md-6 mb-4" data-aos="fade-up" data-aos-delay="{{ loop.index * 50 + 250 }}">
+                                <div class="provider-card h-100 rounded-4 overflow-hidden">
+                                    <div class="provider-header p-3">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div class="d-flex align-items-center">
+                                                <div class="provider-icon {% if provider == 'openai' %}provider-openai{% elif provider == 'anthropic' %}provider-anthropic{% elif provider == 'gemini' %}provider-gemini{% else %}provider-other{% endif %} me-3">
+                                                    <i class="bi {% if provider == 'openai' %}bi-robot{% elif provider == 'anthropic' %}bi-stars{% elif provider == 'gemini' %}bi-gem{% else %}bi-cpu{% endif %}"></i>
+                                                </div>
+                                                <h6 class="fw-bold mb-0">{{ provider|title }}</h6>
+                                            </div>
+                                            <span class="badge models-count">{{ provider_models|length }} Models</span>
+                                        </div>
+                                    </div>
+                                    <div class="provider-body p-0">
+                                        <div class="list-group model-list">
+                                            {% for model in provider_models %}
+                                            <label class="model-item d-flex align-items-center border-bottom px-3 py-3 animate__animated animate__fadeIn" style="animation-delay: {{ loop.index * 0.1 }}s">
+                                                <div class="form-check">
+                                                    <input class="form-check-input model-checkbox" type="checkbox" name="models" value="{{ model.id }}" id="model_{{ model.id }}">
+                                                    <span class="checkmark"></span>
+                                                </div>
+                                                <div class="w-100 ms-2 d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <div class="fw-semibold model-name">{{ model.name }}</div>
+                                                        <div class="text-secondary model-id small">{{ model.id }}</div>
+                                                    </div>
+                                                    <div class="text-end">
+                                                        <span class="price-badge">~${{ model.price }}</span>
+                                                    </div>
+                                                </div>
+                                            </label>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="alert alert-info mt-3" role="alert" data-aos="fade-up">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-info-circle-fill me-2"></i>
+                                <div>
+                                    <strong>Pricing Information</strong>
+                                    <p class="mb-0 small">Model pricing is shown as input/output cost per token. Higher-end models are more powerful but also more expensive. Gemini 2.5 Pro uses tiered pricing (lower rates after 200K tokens). Pricing updated May 2025.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4" data-aos="fade-up" data-aos-delay="300">
+                        <h5>Prompt Template</h5>
+                        <p class="text-muted">Customize the prompt used to instruct AI models. Use <code>{review}</code> as a placeholder for the review text.</p>
+                        
+                        <div class="form-floating mb-3" data-aos="fade-up" data-aos-delay="350">
+                            <textarea class="form-control" id="promptTemplate" name="promptTemplate" style="height: 300px;" required>Analyze the following customer review by categorizing and rating it according to the specified criteria. Assign ratings only for explicitly mentioned aspects. Do not infer or imply information not present in the review. Calculate the average rating for each category based on its rated subcategories.
+Categories and Subcategories:
+Service
+- Friendliness: Assess how friendly and welcoming the staff were.
+- Speed: Evaluate how quick and efficient the service was.
+- Accuracy: Assess to what extent guests received ordered items.
+- Knowledge: Determine if the staff is knowledgeable about the menu, specials, and dietary restrictions.
+Food
+- Taste: Consider the flavor and overall enjoyment of the food.
+- Preparation: Reflect on the presentation, freshness, and how well the food was cooked.
+- Consistency: Evaluate if the quality and preparation of the food are consistent across multiple visits.
+Value
+- Portion Size: Determine if the portions justify the pricing.
+- Price: Assess if the overall pricing of the items offers good value for money.
+- Specials/Deals: Consider the availability and attractiveness of any special offers or deals.
+Environment
+- Cleanliness: Observe the cleanliness of the establishment.
+- Ambiance: Note the noise level, temperature, and overall atmosphere.
+- Table Service: Evaluate the table setup and the condition of the dining area.
+- Accessibility: Assess the ease of access for all customers, including those with disabilities.
+Availability
+- Menu Options: Identify if there were any complaints about items being unavailable or comments on menu variety.
+- Operating Hours: Note any comments related to the opening hours of the establishment.
+- Reservation System: Evaluate the ease and efficiency of the reservation process, if applicable.
+
+Instructions:
+1. Read the review thoroughly.
+2. Identify explicitly mentioned aspects.
+3. Categorize the review into relevant categories and subcategories.
+4. Rate each mentioned subcategory on a scale of 1-10.
+5. Use middle-range scores (5-6) for neutral or mixed comments.
+6. Do not rate or include subcategories not explicitly mentioned.
+7. Calculate the average rating for each category based on its rated subcategories.
+8. If a category has no rated subcategories, set its average to null.
+9. Format your response as a JSON object for easy parsing.
+
+Rating Scale:
+1-10, where 1 is lowest (very poor/negative) and 10 is highest (excellent/very positive).
+
+Example Response:
+{
+  "service": {
+    "average": 8,
+    "subcategories": {
+      "friendliness": 9,
+      "speed": 7
+    }
+  },
+  "food": {
+    "average": 6,
+    "subcategories": {
+      "taste": 6
+    }
+  },
+  "value": null,
+  "environment": null,
+  "availability": null
+}
+
+Please analyze the following review:
+{review}</textarea>
+                            <label for="promptTemplate">Prompt Template</label>
+                        </div>
+                        <div class="text-muted">
+                            <small><i class="bi bi-info-circle"></i> Make sure your prompt contains the <code>{review}</code> placeholder and clear instructions for the AI models.</small>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4" data-aos="fade-up" data-aos-delay="400">
+                        <a href="{{ url_for('index') }}" class="btn btn-light me-md-2">
+                            <i class="bi bi-arrow-left"></i> Back
+                        </a>
+                        <div class="d-flex justify-content-center mt-5" data-aos="fade-up" data-aos-delay="400">
+                            <button type="submit" class="btn btn-primary btn-lg run-button" id="runButton">
+                                <i class="bi bi-play-fill me-2"></i> Run Model Comparison
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Processing Modal -->
+<div id="processingModal" class="modal fade" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-body text-center p-5">
+                <div class="loading-pulse mb-4">
+                    <div class="spinner-grow text-primary" role="status" style="width: 1rem; height: 1rem; animation-delay: 0s"></div>
+                    <div class="spinner-grow text-primary" role="status" style="width: 1rem; height: 1rem; animation-delay: 0.2s"></div>
+                    <div class="spinner-grow text-primary" role="status" style="width: 1rem; height: 1rem; animation-delay: 0.4s"></div>
+                </div>
+                <h5 class="fw-semibold mb-3">Analyzing Your Data</h5>
+                <p class="text-secondary mb-4">We're processing your reviews across the selected models. This typically takes 1-3 minutes depending on data volume.</p>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar progress-bar-animated progress-bar-striped" role="progressbar" style="width: 0%" id="progressIndicator"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block additional_css %}
+<style>
+    /* Enterprise theme styles for configure page */
+    .data-source-card {
+        background-color: #ffffff;
+        border: 1px solid var(--gray-200);
+        transition: all 0.3s ease;
+    }
+    
+    .data-source-card:hover {
+        border-color: var(--gray-300);
+        box-shadow: var(--shadow-md);
+    }
+    
+    .file-icon {
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        color: white;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .data-metrics .h3 {
+        color: var(--primary);
+        font-size: 1.75rem;
+    }
+    
+    /* Review section styling */
+    .data-review-card {
+        background: white;
+        border: 1px solid var(--gray-200);
+    }
+    
+    .search-icon {
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--gray-500);
+        z-index: 2;
+        font-size: 0.8rem;
+    }
+    
+    .search-input {
+        padding-left: 30px;
+        border-radius: var(--border-radius);
+        width: 220px;
+        background-color: var(--gray-50);
+        border-color: var(--gray-200);
+        transition: all 0.3s ease;
+    }
+    
+    .search-input:focus {
+        background-color: #fff;
+        box-shadow: 0 0 0 0.25rem rgba(11, 61, 145, 0.15);
+        border-color: var(--primary);
+    }
+    
+    .btn-icon {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: var(--gray-100);
+        color: var(--gray-700);
+        border: 1px solid var(--gray-300);
+        margin: 0 2px;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-icon:hover {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
+    
+    .review-action-btn {
+        border-radius: var(--border-radius);
+        padding: 0.25rem 0.5rem;
+    }
+    
+    /* Model selection styling */
+    .provider-card {
+        border: 1px solid var(--gray-200);
+        background: white;
+        box-shadow: var(--shadow-sm);
+        transition: all 0.3s ease;
+    }
+    
+    .provider-card:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    .provider-header {
+        border-bottom: 1px solid var(--gray-200);
+        background-color: #f9fafb;
+    }
+    
+    .provider-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.2rem;
+    }
+    
+    .provider-openai {
+        background: linear-gradient(135deg, #10a37f, #0a8c6b);
+    }
+    
+    .provider-anthropic {
+        background: linear-gradient(135deg, #b134eb, #7e24b3);
+    }
+    
+    .provider-gemini {
+        background: linear-gradient(135deg, #4285F4, #0F9D58);
+    }
+    
+    .provider-other {
+        background: linear-gradient(135deg, #8B5CF6, #6D28D9);
+    }
+    
+    .models-count {
+        background-color: rgba(11, 61, 145, 0.1);
+        color: var(--primary);
+        font-weight: 500;
+        border-radius: 20px;
+        padding: 0.25rem 0.75rem;
+    }
+    
+    .model-list {
+        max-height: 350px;
+        overflow-y: auto;
+    }
+    
+    .model-item {
+        transition: all 0.2s ease;
+        cursor: pointer;
+        background: white;
+    }
+    
+    .model-item:hover {
+        background-color: rgba(11, 61, 145, 0.03);
+    }
+    
+    .model-checkbox {
+        cursor: pointer;
+        width: 18px;
+        height: 18px;
+        border-radius: 4px;
+    }
+    
+    .price-badge {
+        display: inline-block;
+        background-color: #EFF6FF;
+        color: #1D4ED8;
+        font-size: 0.8rem;
+        font-weight: 500;
+        padding: 0.2rem 0.7rem;
+        border-radius: 20px;
+        border: 1px solid #DBEAFE;
+    }
+    
+    .model-name {
+        font-size: 0.95rem;
+    }
+    
+    /* Style the review list items */
+    .review-item {
+        border-left: none;
+        border-right: none;
+        padding: 0.75rem 1rem;
+        transition: background-color 0.2s ease;
+    }
+    
+    .review-item:hover {
+        background-color: rgba(11, 61, 145, 0.03);
+    }
+    
+    /* Make the run button more prominent */
+    .run-button {
+        background: var(--primary);
+        border: none;
+        padding: 0.7rem 2rem;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        border-radius: var(--border-radius);
+        box-shadow: 0 4px 6px rgba(11, 61, 145, 0.2);
+        transition: all 0.3s ease;
+    }
+    
+    .run-button:hover {
+        background: var(--primary-dark);
+        box-shadow: 0 6px 10px rgba(11, 61, 145, 0.3);
+        transform: translateY(-2px);
+    }
+    
+    .run-button:active {
+        transform: translateY(0);
+    }
+    
+    .run-button i {
+        transition: transform 0.3s ease;
+    }
+    
+    .run-button:hover i {
+        transform: translateX(3px);
+    }
+</style>
+{% endblock %}
+
+{% block additional_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('configForm');
+        const runButton = document.getElementById('runButton');
+        const processingModal = new bootstrap.Modal(document.getElementById('processingModal'));
+        const progressIndicator = document.getElementById('progressIndicator');
+        
+        // Initialize tooltips
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+          return new bootstrap.Tooltip(tooltipTriggerEl, {
+            boundary: document.body
+          });
+        });
+        
+        // Form validation - only triggered by the Run Analysis button
+        runButton.addEventListener('click', function(event) {
+            // Stop the default form submission to check validation first
+            event.preventDefault();
+            
+            const selectedModels = document.querySelectorAll('input[name="models"]:checked');
+            if (selectedModels.length === 0) {
+                alert('Please select at least one model for analysis.');
+                return false;
+            }
+            
+            const promptTemplate = document.getElementById('promptTemplate').value;
+            if (!promptTemplate.includes('{review}')) {
+                alert('Prompt template must include {review} placeholder.');
+                return false;
+            }
+            
+            // Show processing modal
+            processingModal.show();
+            runButton.disabled = true;
+            
+            // If validation passes, manually submit the form
+            form.submit();
+            return true;
+        });
+        
+        // Prevent the form from submitting when buttons within the form are clicked
+        form.addEventListener('submit', function(event) {
+            // If the submit was not triggered by the Run Analysis button, prevent it
+            if (event.submitter !== runButton) {
+                event.preventDefault();
+            }
+        });
+        
+        // Review pagination and search functionality
+        const totalReviews = {{ total_reviews }};
+        const reviewsPerPage = 10;
+        const totalPages = Math.ceil(totalReviews / reviewsPerPage);
+        let currentPage = 1;
+        
+        // DOM elements
+        const prevPageBtn = document.getElementById('prevPage');
+        const nextPageBtn = document.getElementById('nextPage');
+        const reviewDisplayCount = document.getElementById('reviewDisplayCount');
+        const reviewSearchInput = document.getElementById('reviewSearch');
+        const reviewItems = document.querySelectorAll('.review-item');
+        
+        // Update pagination display
+        function updatePaginationInfo() {
+            const start = ((currentPage - 1) * reviewsPerPage) + 1;
+            const end = Math.min(currentPage * reviewsPerPage, totalReviews);
+            reviewDisplayCount.textContent = `${start}-${end}`;
+            
+            // Update button states
+            prevPageBtn.disabled = currentPage === 1;
+            nextPageBtn.disabled = currentPage === totalPages;
+        }
+        
+        // Show reviews for the current page
+        function showReviewsForPage(page) {
+            reviewItems.forEach(item => {
+                const itemPage = parseInt(item.dataset.page);
+                item.style.display = (itemPage === page) ? '' : 'none';
+            });
+            
+            currentPage = page;
+            updatePaginationInfo();
+        }
+        
+        // Event listeners for pagination buttons
+        prevPageBtn.addEventListener('click', (event) => {
+            // Prevent the event from bubbling up to the form
+            event.preventDefault();
+            event.stopPropagation();
+            
+            if (currentPage > 1) {
+                showReviewsForPage(currentPage - 1);
+            }
+        });
+        
+        nextPageBtn.addEventListener('click', (event) => {
+            // Prevent the event from bubbling up to the form
+            event.preventDefault();
+            event.stopPropagation();
+            
+            if (currentPage < totalPages) {
+                showReviewsForPage(currentPage + 1);
+            }
+        });
+        
+        // Search functionality
+        reviewSearchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            
+            if (searchTerm.length === 0) {
+                // Reset to normal pagination view if search term is cleared
+                reviewItems.forEach(item => {
+                    item.dataset.searchHidden = 'false';
+                    item.style.display = parseInt(item.dataset.page) === currentPage ? '' : 'none';
+                });
+                updatePaginationInfo();
+                return;
+            }
+            
+            // Count visible items for search results
+            let visibleCount = 0;
+            
+            // Show/hide based on search term
+            reviewItems.forEach(item => {
+                const reviewText = item.querySelector('.review-text').textContent.toLowerCase();
+                const matches = reviewText.includes(searchTerm);
+                
+                // If it matches search, show it regardless of page
+                item.style.display = matches ? '' : 'none';
+                item.dataset.searchHidden = matches ? 'false' : 'true';
+                
+                if (matches) visibleCount++;
+            });
+            
+            // Update the display count for search results
+            reviewDisplayCount.textContent = visibleCount === 0 ? 
+                'No matches' : 
+                `${visibleCount} match${visibleCount !== 1 ? 'es' : ''}`;
+                
+            // Disable pagination buttons during search
+            prevPageBtn.disabled = true;
+            nextPageBtn.disabled = true;
+        });
+        
+        // Initialize
+        updatePaginationInfo();
+    });
+</script>
+{% endblock %}
