@@ -2,7 +2,14 @@ import os
 import time
 import json
 import logging
-from datetime import datetime
+from pathlib import Path
+try:
+    # Optional: load .env if present (no hard dependency)
+    from dotenv import load_dotenv  # type: ignore
+    _DOTENV_LOADED = False
+except ImportError:  # pragma: no cover - optional dependency
+    load_dotenv = None  # type: ignore
+    _DOTENV_LOADED = False
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -10,63 +17,117 @@ logger = logging.getLogger(__name__)
 
 # Helper functions
 def load_api_keys():
-    """
-    Load API keys from environment variables or config file
-    
+    """Load API keys strictly from environment variables (.env supported).
+
+    Priority/order:
+      1. If python-dotenv is available and not yet loaded, attempt to load project root .env
+      2. Read required keys from os.environ
+
     Returns:
-        dict: Dictionary of API keys
+        dict: provider -> key (missing or placeholder keys returned as None)
     """
+    global _DOTENV_LOADED
+    if load_dotenv and not _DOTENV_LOADED:
+        # Attempt to load a .env file in project root (two levels up from this file)
+        project_root = Path(__file__).resolve().parent.parent
+        env_path = project_root / '.env'
+        if env_path.exists():
+            try:
+                load_dotenv(env_path)  # silent load
+                _DOTENV_LOADED = True
+            except Exception as exc:  # pragma: no cover
+                print(f"⚠️ Warning: failed to load .env file: {exc}")
+
+    # Support legacy GOOGLE_API_KEY as fallback for Gemini
+    gemini_raw = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY') or ''
     keys = {
-        'openai': os.environ.get('OPENAI_API_KEY'),
-        'anthropic': os.environ.get('ANTHROPIC_API_KEY'),
-        'google': os.environ.get('GEMINI_API_KEY'),  # Use GEMINI_API_KEY for Google/Gemini models
-        'deepseek': os.environ.get('DEEPSEEK_API_KEY')
+        'openai': (os.environ.get('OPENAI_API_KEY') or '').strip(),
+        'anthropic': (os.environ.get('ANTHROPIC_API_KEY') or '').strip(),
+        'google': gemini_raw.strip(),  # Gemini
+        'deepseek': (os.environ.get('DEEPSEEK_API_KEY') or '').strip(),
+        'openrouter': (os.environ.get('OPENROUTER_API_KEY') or '').strip(),
     }
-    
-    # Try to load from config file if environment variables are not set
+
+    # Placeholder detection
+    def _is_placeholder(provider: str, value: str) -> bool:
+        if not value or len(value) < 6:
+            return True
+        if provider == 'anthropic' and (value.startswith('sk-ant-xxx')):
+            return True
+        if provider == 'google' and value.startswith('AIzaxxxxxx'):
+            return True
+        if provider == 'deepseek' and value.startswith('sk-xxxxxxx'):
+            return True
+        if provider == 'openai' and not (value.startswith('sk-') or value.startswith('org-')):
+            return True
+        if provider == 'openrouter' and (
+            'your-openrouter' in value.lower() or value.startswith('sk-or-placeholder')
+        ):
+            return True
+        return False
+
+    cleaned = {}
+    for provider, raw in keys.items():
+        if raw and not _is_placeholder(provider, raw):
+            cleaned[provider] = raw
+            print(f"✅ Found API key for {provider}: {raw[:5]}...")
+        else:
+            cleaned[provider] = None
+            print(f"❌ No valid API key found for {provider}")
+
+    return cleaned
+
+
+def load_app_metadata():
+    """Load optional application metadata used for API headers."""
+    metadata = {
+        'site_url': os.environ.get('SITE_URL'),
+        'app_name': os.environ.get('APP_NAME')
+    }
+
     config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.json')
     if os.path.exists(config_path):
         try:
             with open(config_path, 'r') as f:
                 config = json.load(f)
-                if 'api_keys' in config:
-                    for provider, key in config['api_keys'].items():
-                        if not keys.get(provider) and key:
-                            keys[provider] = key
-                            print(f"✅ Found API key for {provider}: {key[:5]}...") 
-        except Exception as e:
-            print(f"❌ Error loading config file: {str(e)}")
-    
-    # Check for placeholders and warn the user
-    for provider, key in keys.items():
-        if key and len(key) > 5:
-            if provider == 'anthropic' and key.startswith('sk-ant-xxx'):
-                print(f"⚠️ Warning: {provider} API key appears to be a placeholder: {key}")
-                keys[provider] = None
-            elif provider == 'google' and key.startswith('AIzaxxxxxx'):
-                print(f"⚠️ Warning: {provider} API key appears to be a placeholder: {key}")
-                keys[provider] = None
-            elif provider == 'deepseek' and key.startswith('sk-xxxxxxx'):
-                print(f"⚠️ Warning: {provider} API key appears to be a placeholder: {key}")
-                keys[provider] = None
-            elif provider == 'openai' and not (key.startswith('sk-') or key.startswith('org-')):
-                print(f"⚠️ Warning: {provider} API key appears to be invalid: {key[:5]}...")
-                keys[provider] = None
-    
-    # Report available keys
-    for provider, key in keys.items():
-        if key:
-            print(f"✅ Found API key for {provider}: {key[:5]}...")
-        else:
-            print(f"❌ No valid API key found for {provider}")
-    
-    return keys
+                app_config = config.get('app', {}) if isinstance(config, dict) else {}
+                metadata['site_url'] = metadata['site_url'] or app_config.get('site_url')
+                metadata['app_name'] = metadata['app_name'] or app_config.get('app_name')
+        except Exception as exc:
+            print(f"⚠️ Warning: failed to load app metadata from config.json: {exc}")
+
+    if not metadata['site_url']:
+        metadata['site_url'] = 'http://localhost:5005'
+
+    if not metadata['app_name']:
+        metadata['app_name'] = 'Obify Model Comparison Platform'
+
+    return metadata
 
 # Import centralized model configuration
 from utils.model_config import (
-    MODEL_DEFINITIONS, MODEL_PRICING,
-    get_models_by_provider, get_model_pricing, calculate_cost
+    get_models_by_provider, calculate_cost
 )
+
+
+def clean_model_response(response_text):
+    """Remove Markdown code fences (```json ... ``` ) from model responses."""
+    if not isinstance(response_text, str):
+        return response_text
+
+    stripped = response_text.strip()
+    if not stripped.startswith("```"):
+        return response_text
+
+    lines = stripped.splitlines()
+    if lines and lines[0].startswith("```"):
+        lines = lines[1:]
+    while lines and lines[-1].strip().startswith("```"):
+        lines = lines[:-1]
+
+    cleaned = "\n".join(lines).strip()
+    return cleaned if cleaned else response_text
+
 
 # OpenAI models
 def get_valid_openai_models():
@@ -109,7 +170,7 @@ def validate_openai_model(model_name):
 
 def count_tokens(text, model_name):
     """
-    Count tokens accurately using tiktoken or anthropic's tokenizer based on model
+    Count tokens accurately using tiktoken or provider-specific tokenizers.
     
     Args:
         text: The text to count tokens for
@@ -118,47 +179,59 @@ def count_tokens(text, model_name):
     Returns:
         int: Number of tokens in the text
     """
-    # Check if this is a Claude model
+    router_provider = None
+    normalized_model = model_name
+
+    if model_name.startswith('openrouter/'):
+        parts = model_name.split('/')
+        router_provider = parts[1] if len(parts) > 1 else None
+        normalized_model = parts[-1]
+
+        # Map routed model to underlying provider naming conventions
+        if router_provider == 'openai':
+            model_name = normalized_model
+        elif router_provider in ('anthropic', 'claude'):
+            model_name = normalized_model if normalized_model.startswith('claude-') else f"claude-{normalized_model}"
+        elif router_provider == 'deepseek':
+            model_name = normalized_model
+        else:
+            model_name = normalized_model
+    else:
+        normalized_model = model_name
+
+    # Handle Anthropic/Claude models via their tokenizer when available
     if model_name.startswith('claude-'):
         try:
-            # Import anthropic library for Claude models
-            import anthropic
-            # Use anthropic's tokenizer for Claude models
-            from anthropic import Anthropic
-            client = Anthropic(api_key='placeholder')  # We'll set the real key in the API call
-            # Count tokens using anthropic's tokenizer
-            token_count = client.count_tokens(text)
-            return token_count
+            from anthropic import Anthropic  # type: ignore
+            client = Anthropic(api_key='placeholder')  # Real key supplied during API calls
+            return client.count_tokens(text)
         except ImportError:
-            # If anthropic library is not available, use approximate method
             print("Warning: anthropic library not available, using approximate token count")
-            # Claude models use a similar tokenizer to GPT models, rough estimate is sufficient
-            return len(text.split()) * 1.3  # Rough approximation for Claude tokens
+            return len(text.split()) * 1.3
         except Exception as e:
             print(f"Error counting tokens for Claude model: {e}")
-            return len(text.split()) * 1.3  # Fallback to rough approximation
-    
-    # For OpenAI models, use tiktoken
+            return len(text.split()) * 1.3
+
+    # DeepSeek (routed through OpenRouter) does not have a dedicated tokenizer in this project
+    if router_provider == 'deepseek' or normalized_model.startswith('deepseek'):
+        return len(text.split()) * 1.3
+
     import tiktoken
-    
-    # Get the appropriate encoding for the model
+
     try:
         if model_name.startswith('gpt-4'):
             encoding = tiktoken.encoding_for_model('gpt-4')
         elif model_name.startswith('gpt-3.5'):
             encoding = tiktoken.encoding_for_model('gpt-3.5-turbo')
         elif model_name.startswith('o1') or model_name.startswith('o3') or model_name.startswith('o4'):
-            encoding = tiktoken.encoding_for_model('gpt-4')  # Use gpt-4 encoding for o1/o3/o4 models
+            encoding = tiktoken.encoding_for_model('gpt-4')
         else:
-            encoding = tiktoken.get_encoding('cl100k_base')  # Default encoding
-        
-        # Count tokens
-        token_count = len(encoding.encode(text))
-        return token_count
+            encoding = tiktoken.get_encoding('cl100k_base')
+
+        return len(encoding.encode(text))
     except Exception as e:
         print(f"Error counting tokens: {e}")
-        # Fallback method - rough estimate
-        return len(text.split()) * 1.3  # Rough approximation
+        return len(text.split()) * 1.3
 
 def call_anthropic_api(model_name, prompt, max_tokens=500, temperature=0.1):
     """
@@ -174,27 +247,14 @@ def call_anthropic_api(model_name, prompt, max_tokens=500, temperature=0.1):
         tuple: (response text, prompt tokens, completion tokens, latency)
     """
     import requests
-    import json
-    import time
     
     start_time = time.time()
     
     try:
-        # Get API key from config.json
-        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config.json')
-        api_key = None
-        
-        # Try to load from config file
-        try:
-            if os.path.exists(config_path):
-                with open(config_path, 'r') as config_file:
-                    config = json.load(config_file)
-                    api_key = config.get('api_keys', {}).get('anthropic', '')
-        except Exception as config_error:
-            print(f"Error loading config file: {config_error}")
-        
+        # Retrieve Anthropic key strictly from environment loader
+        api_key = load_api_keys().get('anthropic')
         if not api_key:
-            return "Error: Anthropic API key not found in config file.", 0, 0, 0
+            return "Error: Anthropic API key not configured.", 0, 0, 0
         
         # Set up API request
         headers = {
@@ -330,23 +390,9 @@ def call_gemini_api(model_name, prompt, max_tokens=500, temperature=0.1):
     start_time = time.time()
     
     try:
-        # Load API keys
-        api_keys = load_api_keys()
-        gemini_key = api_keys.get('google')
-        
+        gemini_key = load_api_keys().get('google')
         if not gemini_key:
-            # Try to load from config file
-            config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.json')
-            try:
-                if os.path.exists(config_path):
-                    with open(config_path, 'r') as config_file:
-                        config = json.load(config_file)
-                        gemini_key = config.get('api_keys', {}).get('google', '')
-            except Exception as config_error:
-                print(f"Error loading config file: {config_error}")
-            
-        if not gemini_key:
-            return "Error: Gemini API key not found in config file.", 0, 0, 0
+            return "Error: Gemini API key not configured.", 0, 0, 0
         
         # Import the Google Generative AI library
         try:
@@ -438,6 +484,140 @@ def call_gemini(model_name, prompt):
         print(f"🚨 Error: {response_text}")
     
     return response_text, prompt_tokens, completion_tokens, latency
+
+def call_openrouter_api(model_name, prompt, max_tokens=2048, temperature=0.7):
+    """Invoke the OpenRouter chat completions endpoint."""
+    import requests
+
+    api_model_name = model_name
+    if model_name.startswith('openrouter/'):
+        api_model_name = model_name.split('openrouter/', 1)[1]
+
+    print(f"🔄 OPENROUTER API CALL STARTED: {model_name} (API id: {api_model_name})")
+    start_time = time.time()
+
+    api_keys = load_api_keys()
+    openrouter_key = api_keys.get('openrouter')
+
+    if not openrouter_key:
+        warning = "Error: OpenRouter API key not configured."
+        print(f"❌ {warning}")
+        return warning, 0, 0, 0, {}
+
+    app_metadata = load_app_metadata()
+
+    headers = {
+        "Authorization": f"Bearer {openrouter_key}",
+        "HTTP-Referer": app_metadata['site_url'],
+        "X-Title": app_metadata['app_name'],
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant that summarizes customer reviews."},
+        {"role": "user", "content": prompt}
+    ]
+
+    payload = {
+        "model": api_model_name,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "stream": False
+    }
+
+    max_retries = 3
+    retry_delay = 1
+
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=60
+            )
+
+            if response.status_code >= 400:
+                try:
+                    error_body = response.json()
+                    error_detail = error_body.get('error') if isinstance(error_body, dict) else None
+                    error_message = error_detail.get('message') if isinstance(error_detail, dict) else response.text
+                except Exception:
+                    error_message = response.text
+
+                print(f"❌ OpenRouter HTTP error ({response.status_code}): {error_message}")
+
+                if response.status_code in (429, 500, 502, 503, 504) and attempt < max_retries - 1:
+                    print(f"   Retrying OpenRouter call ({attempt + 1}/{max_retries}) after {retry_delay}s...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+
+                return f"Error: OpenRouter API returned {response.status_code}: {error_message}", 0, 0, time.time() - start_time, {}
+
+            data = response.json()
+            choices = data.get('choices', [])
+            first_choice = choices[0] if choices else {}
+            message_content = first_choice.get('message', {}).get('content', '') if isinstance(first_choice, dict) else ''
+
+            usage = data.get('usage', {}) if isinstance(data, dict) else {}
+            prompt_tokens = usage.get('prompt_tokens', 0) or 0
+            completion_tokens = usage.get('completion_tokens', 0) or 0
+
+            if prompt_tokens == 0:
+                prompt_tokens = count_tokens(prompt, model_name)
+            if completion_tokens == 0 and message_content:
+                completion_tokens = count_tokens(message_content, model_name)
+
+            latency = time.time() - start_time
+
+            raw_total_cost = usage.get('total_cost') if isinstance(usage, dict) else None
+            try:
+                actual_cost = float(raw_total_cost) if raw_total_cost is not None else None
+            except (TypeError, ValueError):
+                actual_cost = None
+
+            print(f"✅ OPENROUTER API CALL COMPLETED: {model_name}")
+            print(f"⏱️ Time: {latency:.2f} seconds")
+            print(f"🔤 Tokens: {prompt_tokens} prompt + {completion_tokens} completion = {prompt_tokens + completion_tokens} total")
+            if actual_cost is not None:
+                print(f"💲 Usage cost reported by OpenRouter: ${actual_cost:.6f}")
+
+            if len(message_content) > 300:
+                preview = message_content[:300] + "..."
+            else:
+                preview = message_content
+            print(f"📝 Response preview: {preview}")
+
+            metadata = {
+                'actual_cost': actual_cost,
+                'usage': usage
+            }
+
+            return message_content, prompt_tokens, completion_tokens, latency, metadata
+
+        except requests.exceptions.Timeout:
+            print(f"⏳ OpenRouter request timed out (attempt {attempt + 1}/{max_retries})")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                retry_delay *= 2
+                continue
+            return "Error: OpenRouter request timed out.", 0, 0, time.time() - start_time, {}
+        except requests.exceptions.RequestException as exc:
+            print(f"❌ OpenRouter request failed: {exc}")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                retry_delay *= 2
+                continue
+            return f"Error: OpenRouter request failed: {exc}", 0, 0, time.time() - start_time, {}
+        except Exception as exc:
+            print(f"❌ Unexpected error during OpenRouter call: {exc}")
+            return f"Error: {exc}", 0, 0, time.time() - start_time, {}
+
+    return "Error: OpenRouter retries exhausted.", 0, 0, time.time() - start_time, {}
+
 
 def call_openai(model_name, prompt):
     """
@@ -547,6 +727,7 @@ def test_models(reviews, models, prompt_template):
         total_completion_tokens = 0
         total_latency = 0
         errors = 0
+        total_cost_value = 0.0
         
         # Process each review with this model
         for i, review in enumerate(reviews):
@@ -560,20 +741,43 @@ def test_models(reviews, models, prompt_template):
             # Call the model
             start_time = time.time()
             try:
-                # Check if this is a Claude model, Gemini model, or OpenAI model and call appropriate API
-                if model.startswith('claude-'):
-                    response, prompt_tokens, completion_tokens, latency = call_claude(model, prompt)
+                call_metadata = {}
+
+                # Route to the appropriate provider implementation
+                cost_model_reference = model
+
+                if model.startswith('openrouter/'):
+                    call_result = call_openrouter_api(model, prompt)
+                elif model.startswith('deepseek'):
+                    routed_model = model
+                    if not model.startswith('openrouter/'):
+                        routed_model = f"openrouter/{model}"
+                    cost_model_reference = routed_model
+                    call_result = call_openrouter_api(routed_model, prompt)
+                elif model.startswith('claude-'):
+                    call_result = call_claude(model, prompt)
                 elif model.startswith('gemini-'):
-                    response, prompt_tokens, completion_tokens, latency = call_gemini(model, prompt)
+                    call_result = call_gemini(model, prompt)
                 else:
-                    # Default to OpenAI for all other models
-                    response, prompt_tokens, completion_tokens, latency = call_openai(model, prompt)
-                    
+                    call_result = call_openai(model, prompt)
+
+                if isinstance(call_result, tuple) and len(call_result) == 5:
+                    response, prompt_tokens, completion_tokens, latency, call_metadata = call_result
+                elif isinstance(call_result, tuple) and len(call_result) == 4:
+                    response, prompt_tokens, completion_tokens, latency = call_result
+                else:
+                    response = str(call_result)
+                    prompt_tokens = 0
+                    completion_tokens = 0
+                    latency = 0
+
+                response = clean_model_response(response)
+
                 end_time = time.time()
                 total_time = end_time - start_time
 
                 # Check if response was successful
-                success = not response.startswith("Error:")
+                success = not (isinstance(response, str) and response.startswith("Error:"))
 
                 if success:
                     successful_calls += 1
@@ -584,8 +788,13 @@ def test_models(reviews, models, prompt_template):
                     errors += 1
                 
                 # Calculate cost using the centralized pricing calculation function
-                total_cost = calculate_cost(model.replace('openai:', ''), prompt_tokens, completion_tokens)
-                
+                cost_model_name = cost_model_reference.replace('openai:', '')
+                total_cost = calculate_cost(cost_model_name, prompt_tokens, completion_tokens)
+
+                actual_cost = call_metadata.get('actual_cost') if isinstance(call_metadata, dict) else None
+                if isinstance(actual_cost, (int, float)):
+                    total_cost = actual_cost
+
                 # Store token counts for clear reporting in the results
                 
                 # Record result for this review
@@ -602,11 +811,19 @@ def test_models(reviews, models, prompt_template):
                     'total_time': total_time,
                     'cost': total_cost
                 }
+
+                if isinstance(call_metadata, dict):
+                    if call_metadata.get('actual_cost') is not None:
+                        result['actual_cost'] = call_metadata['actual_cost']
+                    if call_metadata.get('usage') is not None:
+                        result['usage'] = call_metadata['usage']
                 
                 model_results.append(result)
-                
+
                 status = "✅" if success else "❌"
                 print(f"    {status} Review {i+1}: {total_time:.2f}s, {prompt_tokens+completion_tokens} tokens")
+
+                total_cost_value += total_cost if isinstance(total_cost, (int, float)) else 0.0
                 
             except Exception as e:
                 end_time = time.time()
@@ -645,7 +862,8 @@ def test_models(reviews, models, prompt_template):
             'avg_prompt_tokens': total_prompt_tokens / successful_calls if successful_calls > 0 else 0,
             'avg_completion_tokens': total_completion_tokens / successful_calls if successful_calls > 0 else 0,
             'avg_tokens': (total_prompt_tokens + total_completion_tokens) / successful_calls if successful_calls > 0 else 0,
-            'average_latency': total_latency / successful_calls if successful_calls > 0 else 0
+            'average_latency': total_latency / successful_calls if successful_calls > 0 else 0,
+            'total_cost': total_cost_value
         }
         
         # Print summary for this model

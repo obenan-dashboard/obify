@@ -14,6 +14,7 @@ from utils.model_handler import call_openai, test_models  # Focus only on OpenAI
 from utils.openai_validator import validate_openai_key
 from utils.evaluator import evaluate_results
 from utils.report_generator import generate_report
+from utils.model_config import MODEL_DEFINITIONS, get_models_by_provider, get_model_pricing
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -31,20 +32,87 @@ app.config['ALLOWED_EXTENSIONS'] = {'csv', 'txt', 'xls', 'xlsx'}
 for folder in [app.config['UPLOAD_FOLDER'], app.config['REPORTS_FOLDER']]:
     os.makedirs(folder, exist_ok=True)
 
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+
+
+def _format_price_display(pricing):
+    """Return a compact price string for UI badges."""
+    if not pricing or not isinstance(pricing, dict):
+        return 'N/A'
+
+    input_price = pricing.get('input')
+    output_price = pricing.get('output')
+
+    def _fmt(value):
+        if value is None:
+            return 'N/A'
+        if value == 0:
+            return '0.000'
+        if value < 0.1:
+            return f"{value:.4f}"
+        if value < 1:
+            return f"{value:.3f}"
+        return f"{value:.2f}"
+
+    formatted_input = _fmt(input_price)
+    formatted_output = _fmt(output_price)
+
+    if formatted_input == formatted_output:
+        return formatted_input
+
+    return f"{formatted_input}/{formatted_output}"
+
+
+def _build_model_option(model_id, fallback_name=None):
+    """Create a model descriptor for UI consumption."""
+    details = MODEL_DEFINITIONS.get(model_id, {})
+    pricing = get_model_pricing(model_id)
+
+    display_name = fallback_name or details.get('display_name') or model_id
+    price_display = _format_price_display(pricing)
+
+    return {
+        'id': model_id,
+        'name': display_name,
+        'price': price_display,
+        'provider': details.get('provider', 'unknown')
+    }
+
+
 # Validate API key at startup
 try:
     logger.info("Validating OpenAI API key at startup...")
     
-    # Load API keys from config
+    # Load API keys from config/environment
+    config_data = {}
     config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+    openai_key = None
+
     if os.path.exists(config_path):
         with open(config_path, 'r') as f:
-            config = json.load(f)
-            openai_key = config.get('api_keys', {}).get('openai')
-    else:
+            config_data = json.load(f) or {}
+            openai_key = config_data.get('api_keys', {}).get('openai')
+
+    if not openai_key:
         openai_key = os.environ.get('OPENAI_API_KEY')
-        
-    logger.info(f"Testing OpenAI API key: {openai_key[:5]}...")
+
+    openrouter_key = os.environ.get('OPENROUTER_API_KEY')
+    if (not openrouter_key) and config_data:
+        openrouter_key = config_data.get('api_keys', {}).get('openrouter')
+
+    if openrouter_key:
+        openrouter_key = openrouter_key.strip()
+        placeholder = 'your-openrouter' in openrouter_key.lower() or openrouter_key.startswith('sk-or-placeholder')
+        if placeholder:
+            logger.warning("OpenRouter API key appears to be a placeholder; disabling OpenRouter models")
+            openrouter_key = ''
+
+    app.config['OPENROUTER_ENABLED'] = bool(openrouter_key)
+    app.config['OPENROUTER_KEY_PREVIEW'] = f"{openrouter_key[:5]}..." if openrouter_key else None
+
+    logger.info(f"Testing OpenAI API key: {(openai_key[:5] + '...') if openai_key else 'missing'}")
     is_valid, error_message, available_models = validate_openai_key(openai_key)
     
     if not is_valid:
@@ -65,7 +133,6 @@ try:
         app.config['API_KEY_ERROR'] = None
         
         # Filter to only include the requested GPT models
-        # Only include specific models requested by the user
         preferred_openai_models = [
             'gpt-4',
             'gpt-4-0613',
@@ -75,8 +142,7 @@ try:
             'gpt-4o-mini',
             'gpt-3.5-turbo'
         ]
-        
-        # Add Claude models
+
         claude_models = [
             'claude-3-7-sonnet-20250219',
             'claude-3-5-sonnet-20241022',
@@ -88,8 +154,7 @@ try:
             'claude-2.1',
             'claude-2.0'
         ]
-        
-        # Add Gemini models
+
         gemini_models = [
             'gemini-2.5-pro',
             'gemini-2.5-flash',
@@ -97,50 +162,56 @@ try:
             'gemini-2.0-flash',
             'gemini-2.0-flash-lite'
         ]
-        
-        # Format models for the template
+
         formatted_models = {
             'openai': [],
             'claude': [],
-            'gemini': []
+            'gemini': [],
+            'openrouter': []
         }
-        
-        # First add preferred OpenAI models that are available
+
         for model_id in preferred_openai_models:
             if model_id in available_models:
-                formatted_models['openai'].append(
-                    {'id': model_id, 'name': model_id.replace('gpt-', 'GPT-').title()}
-                )
-                
-        # Add Claude models
+                formatted_models['openai'].append(_build_model_option(model_id))
+
         for model_id in claude_models:
-            # Anthropic models don't need to be validated like OpenAI models
-            # Format the display name more nicely
             display_name = model_id
             if '-2025' in model_id or '-2024' in model_id:
-                # Remove the date from the display name
                 base_name = model_id.split('-2')[0]
                 display_name = base_name.replace('claude-', 'Claude ').replace('-', ' ').title()
             else:
                 display_name = model_id.replace('claude-', 'Claude ').title()
-                
-            formatted_models['claude'].append(
-                {'id': model_id, 'name': display_name}
-            )
-            
-        # Add Gemini models
+            formatted_models['claude'].append(_build_model_option(model_id, fallback_name=display_name))
+
         for model_id in gemini_models:
-            # Format the display name more nicely
             display_name = model_id.replace('gemini-', 'Gemini ').replace('-', ' ').title()
-            
-            formatted_models['gemini'].append(
-                {'id': model_id, 'name': display_name}
-            )
+            formatted_models['gemini'].append(_build_model_option(model_id, fallback_name=display_name))
+
+        if app.config['OPENROUTER_ENABLED']:
+            openrouter_models = get_models_by_provider('openrouter')
+            openrouter_preview = f"{openrouter_key[:5]}..." if openrouter_key else None
+            app.config['OPENROUTER_KEY_PREVIEW'] = openrouter_preview
+
+            logger.info(f"OpenRouter key detected; registering {len(openrouter_models)} OpenRouter models")
+
+            for model_id in openrouter_models:
+                parts = model_id.split('/')
+                provider_hint = parts[1].replace('-', ' ').title() if len(parts) > 1 else 'OpenRouter'
+                base_display = MODEL_DEFINITIONS.get(model_id, {}).get('display_name')
+                fallback_display = base_display or parts[-1].replace('-', ' ').title()
+                if provider_hint and provider_hint not in fallback_display:
+                    fallback_display = f"{fallback_display} ({provider_hint})"
+                formatted_models['openrouter'].append(_build_model_option(model_id, fallback_name=fallback_display))
+        else:
+            app.config['OPENROUTER_KEY_PREVIEW'] = None
+
         app.config['AVAILABLE_MODELS'] = formatted_models
 except Exception as e:
     logger.error(f"Error during API key validation: {str(e)}")
     app.config['API_KEY_VALID'] = False
     app.config['API_KEY_ERROR'] = str(e)
+    app.config['OPENROUTER_ENABLED'] = False
+    app.config['OPENROUTER_KEY_PREVIEW'] = None
     app.config['AVAILABLE_MODELS'] = {
         'openai': [
             {'id': 'gpt-3.5-turbo', 'name': 'GPT-3.5 Turbo'},
@@ -161,12 +232,9 @@ except Exception as e:
             {'id': 'gemini-2.5-flash-lite', 'name': 'Gemini 2.5 Flash Lite'},
             {'id': 'gemini-2.0-flash', 'name': 'Gemini 2.0 Flash'},
             {'id': 'gemini-2.0-flash-lite', 'name': 'Gemini 2.0 Flash Lite'}
-        ]
+        ],
+        'openrouter': []
     }
-
-# Helper functions
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
 def get_available_models():
     """
@@ -197,7 +265,8 @@ def get_available_models():
             {'id': 'claude-3-5-haiku-20241022', 'name': 'Claude 3.5 Haiku'},
             {'id': 'claude-3-opus-20240229', 'name': 'Claude 3 Opus'},
             {'id': 'claude-3-haiku-20240307', 'name': 'Claude 3 Haiku'}
-        ]
+        ],
+        'openrouter': []
     }
 
 # Routes
@@ -410,7 +479,9 @@ def configure_test(timestamp):
         total_reviews=total_reviews,
         timestamp=timestamp,
         original_filename=original_filename,
-        selected_column=selected_column
+        selected_column=selected_column,
+        openrouter_enabled=app.config.get('OPENROUTER_ENABLED', False),
+        openrouter_key_preview=app.config.get('OPENROUTER_KEY_PREVIEW')
     )
 
 @app.route('/run_test', methods=['POST'])
@@ -469,7 +540,13 @@ def run_test():
         logger.error(f"   - prompt_template present: {prompt_template is not None}")
         flash('Missing required parameters')
         return redirect(url_for('index'))
-    
+
+    if any(model.startswith('openrouter/') or model.startswith('deepseek') for model in selected_models):
+        if not app.config.get('OPENROUTER_ENABLED', False):
+            logger.error("❌ OpenRouter models selected without configured API key")
+            flash('OpenRouter models require a valid OPENROUTER_API_KEY. Please update your configuration and try again.')
+            return redirect(url_for('configure_test', timestamp=timestamp))
+
     # Load the reviews
     temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f'temp_{timestamp}.json')
     # New workflow: Check for reviews file first

@@ -120,15 +120,30 @@
                         
                         <div class="row model-selection-container">
                             {% for provider, provider_models in models.items() %}
+                            {% set provider_name = provider|title %}
+                            {% if provider == 'claude' %}
+                                {% set provider_name = 'Anthropic Claude' %}
+                            {% elif provider == 'gemini' %}
+                                {% set provider_name = 'Google Gemini' %}
+                            {% elif provider == 'openrouter' %}
+                                {% set provider_name = 'OpenRouter' %}
+                            {% elif provider == 'anthropic' %}
+                                {% set provider_name = 'Anthropic Claude' %}
+                            {% endif %}
                             <div class="col-md-6 mb-4" data-aos="fade-up" data-aos-delay="{{ loop.index * 50 + 250 }}">
                                 <div class="provider-card h-100 rounded-4 overflow-hidden">
                                     <div class="provider-header p-3">
                                         <div class="d-flex justify-content-between align-items-center">
                                             <div class="d-flex align-items-center">
-                                                <div class="provider-icon {% if provider == 'openai' %}provider-openai{% elif provider == 'anthropic' %}provider-anthropic{% elif provider == 'gemini' %}provider-gemini{% else %}provider-other{% endif %} me-3">
-                                                    <i class="bi {% if provider == 'openai' %}bi-robot{% elif provider == 'anthropic' %}bi-stars{% elif provider == 'gemini' %}bi-gem{% else %}bi-cpu{% endif %}"></i>
+                                                <div class="provider-icon {% if provider == 'openai' %}provider-openai{% elif provider in ['anthropic', 'claude'] %}provider-anthropic{% elif provider in ['gemini', 'google'] %}provider-gemini{% elif provider == 'openrouter' %}provider-openrouter{% else %}provider-other{% endif %} me-3">
+                                                    <i class="bi {% if provider == 'openai' %}bi-robot{% elif provider in ['anthropic', 'claude'] %}bi-stars{% elif provider in ['gemini', 'google'] %}bi-gem{% elif provider == 'openrouter' %}bi-diagram-3{% else %}bi-cpu{% endif %}"></i>
                                                 </div>
-                                                <h6 class="fw-bold mb-0">{{ provider|title }}</h6>
+                                                <div>
+                                                    <h6 class="fw-bold mb-0">{{ provider_name }}</h6>
+                                                    {% if provider == 'openrouter' and not openrouter_enabled %}
+                                                        <div class="text-danger small">API key required</div>
+                                                    {% endif %}
+                                                </div>
                                             </div>
                                             <span class="badge models-count">{{ provider_models|length }} Models</span>
                                         </div>
@@ -399,6 +414,10 @@ Please analyze the following review:
     
     .provider-gemini {
         background: linear-gradient(135deg, #4285F4, #0F9D58);
+    }
+
+    .provider-openrouter {
+        background: linear-gradient(135deg, #1f2937, #4b5563);
     }
     
     .provider-other {

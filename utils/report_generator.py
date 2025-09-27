@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import base64
 from io import BytesIO
+from utils.model_config import MODEL_DEFINITIONS, get_model_provider
 
 def format_cost(cost_value, precision=6):
     """
@@ -89,10 +90,12 @@ def create_bar_chart(data, title, labels, values_key, filename=None):
     # Handle model names with or without provider prefixes
     model_labels = []
     for label in labels:
-        if ':' in label:
-            model_labels.append(label.split(':')[1])  # Get part after provider prefix
-        else:
-            model_labels.append(label)  # Use full name if no prefix
+        normalized_label = label
+        if ':' in normalized_label:
+            normalized_label = normalized_label.split(':', 1)[1]
+        if '/' in normalized_label:
+            normalized_label = normalized_label.split('/')[-1]
+        model_labels.append(normalized_label)
     
     plt.xticks(x, model_labels, rotation=45, ha='right')
     plt.title(title)
@@ -139,10 +142,12 @@ def create_comparison_chart(data, title, labels, metrics, filename=None):
     # Handle model names with or without provider prefixes
     model_labels = []
     for label in labels:
-        if ':' in label:
-            model_labels.append(label.split(':')[1])  # Get part after provider prefix
-        else:
-            model_labels.append(label)  # Use full name if no prefix
+        normalized_label = label
+        if ':' in normalized_label:
+            normalized_label = normalized_label.split(':', 1)[1]
+        if '/' in normalized_label:
+            normalized_label = normalized_label.split('/')[-1]
+        model_labels.append(normalized_label)
     
     plt.xticks(x, model_labels, rotation=45, ha='right')
     plt.title(title)
@@ -222,7 +227,7 @@ def generate_charts(evaluation, results, report_folder, report_name):
     
     return charts
 
-def format_model_summary(model, stats, evaluation):
+def format_model_summary(model, stats, evaluation, total_cost=0.0):
     """
     Format a summary of model performance
     
@@ -230,18 +235,40 @@ def format_model_summary(model, stats, evaluation):
         model: Model name
         stats: Statistics for the model
         evaluation: Evaluation results for the model
+        total_cost: Aggregate cost calculated for the model
         
     Returns:
         dict: Formatted model summary
     """
-    # Handle model names with or without a provider prefix
-    if ':' in model:
-        _, model_name = model.split(':')
-    else:
-        model_name = model
-    
+    provider = get_model_provider(model)
+
+    display_name = MODEL_DEFINITIONS.get(model, {}).get('display_name')
+    normalized_name = model
+
+    if ':' in normalized_name:
+        normalized_name = normalized_name.split(':', 1)[1]
+    if '/' in normalized_name:
+        normalized_name = normalized_name.split('/')[-1]
+
+    if not display_name:
+        display_name = normalized_name.replace('-', ' ').title()
+
+    provider_label = (provider.title() if provider else 'Unknown').replace('Claude', 'Claude')
+
+    if provider in ('claude', 'anthropic'):
+        provider_label = 'Anthropic Claude'
+    elif provider in ('gemini', 'google'):
+        provider_label = 'Google Gemini'
+    elif provider == 'openrouter':
+        parts = model.split('/')
+        upstream = parts[1].replace('-', ' ').title() if len(parts) > 1 else ''
+        provider_label = f"OpenRouter ({upstream})" if upstream else 'OpenRouter'
+
+    total_cost_value = total_cost if isinstance(total_cost, (int, float)) else 0.0
+    total_cost_display = format_cost(total_cost_value, precision=4) if total_cost_value else "$0.0000"
+
     return {
-        'model_name': model_name,
+        'model_name': display_name,
         'full_name': model,
         'success_rate': f"{evaluation.get('success_rate', 0) * 100:.2f}%",
         'avg_latency': f"{evaluation.get('avg_latency', 0):.2f} seconds",
@@ -259,7 +286,11 @@ def format_model_summary(model, stats, evaluation):
         'avg_input_tokens': int(stats.get('avg_prompt_tokens', 0)),
         'avg_output_tokens': int(stats.get('avg_completion_tokens', 0)),
         'total_input_tokens': int(stats.get('total_prompt_tokens', 0)),
-        'total_output_tokens': int(stats.get('total_completion_tokens', 0))
+        'total_output_tokens': int(stats.get('total_completion_tokens', 0)),
+        'total_cost': total_cost_display,
+        'raw_total_cost': total_cost_value,
+        'provider': provider,
+        'provider_label': provider_label
     }
 
 def generate_report(results, evaluation, original_filename, report_name, report_folder):
@@ -295,7 +326,18 @@ def generate_report(results, evaluation, original_filename, report_name, report_
     for model in [m for m in results if not m.endswith('_stats')]:
         stats = results.get(f"{model}_stats", {})
         model_eval = evaluation.get(model, {})
-        report['models'][model] = format_model_summary(model, stats, model_eval)
+        model_entries = results.get(model, []) or []
+
+        total_cost_value = 0.0
+        for entry in model_entries:
+            if isinstance(entry, dict):
+                cost_candidate = entry.get('actual_cost')
+                if isinstance(cost_candidate, (int, float)):
+                    total_cost_value += cost_candidate
+                else:
+                    total_cost_value += entry.get('cost', 0) or 0
+
+        report['models'][model] = format_model_summary(model, stats, model_eval, total_cost=total_cost_value)
     
     # Calculate overall recommendations
     if 'ranking' in evaluation and 'overall' in evaluation['ranking'] and evaluation['ranking']['overall']:

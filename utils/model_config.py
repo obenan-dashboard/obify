@@ -24,7 +24,11 @@ Usage:
 MODEL_PROVIDERS = {
     'gpt-': 'openai',
     'claude-': 'anthropic',
-    'gemini-': 'google'
+    'gemini-': 'google',
+    'openrouter/': 'openrouter',
+    'deepseek/': 'openrouter',
+    'mistralai/': 'openrouter',
+    'qwen/': 'openrouter'
 }
 
 # Complete list of all supported models with their details
@@ -187,6 +191,55 @@ MODEL_DEFINITIONS = {
         'max_tokens': 524288,  # 512k context window
         'default_max_output_tokens': 8192,
         'default_temperature': 0.7,
+    },
+    # OpenRouter proxied models
+    'openrouter/deepseek/deepseek-chat-v3.1': {
+        'provider': 'openrouter',
+        'display_name': 'DeepSeek V3.1',
+        'description': 'DeepSeek chat model (v3.1) routed via OpenRouter',
+        'max_tokens': 200000,
+        'default_max_output_tokens': 4096,
+        'default_temperature': 0.2,
+    },
+    'openrouter/deepseek/deepseek-chat-v3-0324': {
+        'provider': 'openrouter',
+        'display_name': 'DeepSeek V3 0324',
+        'description': 'DeepSeek chat model (v3 0324) routed via OpenRouter',
+        'max_tokens': 200000,
+        'default_max_output_tokens': 4096,
+        'default_temperature': 0.2,
+    },
+    'openrouter/deepseek/deepseek-r1-0528': {
+        'provider': 'openrouter',
+        'display_name': 'DeepSeek R1 0528',
+        'description': 'DeepSeek reasoning model R1 0528 routed via OpenRouter',
+        'max_tokens': 200000,
+        'default_max_output_tokens': 4096,
+        'default_temperature': 0.2,
+    },
+    'openrouter/mistralai/mistral-nemo': {
+        'provider': 'openrouter',
+        'display_name': 'Mistral Nemo',
+        'description': 'Mistral Nemo served via OpenRouter aggregation',
+        'max_tokens': 131072,
+        'default_max_output_tokens': 4096,
+        'default_temperature': 0.4,
+    },
+    'openrouter/mistralai/mistral-small-24b-instruct-2501': {
+        'provider': 'openrouter',
+        'display_name': 'Mistral Small 3',
+        'description': 'Mistral Small 24B Instruct (2501) via OpenRouter',
+        'max_tokens': 65536,
+        'default_max_output_tokens': 4096,
+        'default_temperature': 0.4,
+    },
+    'openrouter/qwen/qwen3-235b-a22b-2507': {
+        'provider': 'openrouter',
+        'display_name': 'Qwen3 235B A22B Instruct 2507',
+        'description': 'Qwen3 235B A22B routed via OpenRouter',
+        'max_tokens': 200000,
+        'default_max_output_tokens': 4096,
+        'default_temperature': 0.4,
     }
 }
 
@@ -271,7 +324,15 @@ MODEL_PRICING = {
     'gemini-2.5-flash': {'input': 0.70, 'output': 2.10},  # $0.70/1M input, $2.10/1M output
     'gemini-2.5-flash-lite': {'input': 0.35, 'output': 1.05},  # $0.35/1M input, $1.05/1M output
     'gemini-2.0-flash': {'input': 0.35, 'output': 1.05},  # $0.35/1M input, $1.05/1M output
-    'gemini-2.0-flash-lite': {'input': 0.175, 'output': 0.525}  # $0.175/1M input, $0.525/1M output
+    'gemini-2.0-flash-lite': {'input': 0.175, 'output': 0.525},  # $0.175/1M input, $0.525/1M output
+
+    # OpenRouter proxied models (USD per 1M tokens; approximate values)
+    'openrouter/deepseek/deepseek-chat-v3.1': {'input': 0.14, 'output': 0.28},
+    'openrouter/deepseek/deepseek-chat-v3-0324': {'input': 0.14, 'output': 0.28},
+    'openrouter/deepseek/deepseek-r1-0528': {'input': 0.55, 'output': 0.65},
+    'openrouter/mistralai/mistral-nemo': {'input': 0.60, 'output': 1.80},
+    'openrouter/mistralai/mistral-small-24b-instruct-2501': {'input': 0.35, 'output': 1.05},
+    'openrouter/qwen/qwen3-235b-a22b-2507': {'input': 0.50, 'output': 1.50}
 }
 
 def get_model_provider(model_name):
@@ -282,7 +343,7 @@ def get_model_provider(model_name):
         model_name (str): Name of the model
         
     Returns:
-        str: Provider name ('openai', 'anthropic', 'google') or None if not found
+        str: Provider name ('openai', 'anthropic', 'google', 'openrouter') or None if not found
     """
     if model_name in MODEL_DEFINITIONS:
         return MODEL_DEFINITIONS[model_name]['provider']

@@ -11,26 +11,35 @@ build/
 # Virtual environments
 venv/
 env/
+.venv/
 .env/
 
-# IDE files
+# IDE / Editor
 .idea/
 .vscode/
 *.sublime-*
+*.code-workspace
 
 # Logs
 *.log
 logs/
+coverage.xml
 
 # Local configuration
 config.json
 .env
+.env.local
+.env.development
+.env.production
+.env.test
+.env.*.backup
 
-# Data files
+# Data files / media
 data/
 !data/.gitkeep
 !data/uploads/.gitkeep
 !data/reports/.gitkeep
+demo.MP4
 
 # Mac OS files
 .DS_Store
@@ -38,7 +47,33 @@ data/
 # Temporary files
 *.tmp
 *.swp
+*.bak
+*.orig
+*.rej
 
 # Test coverage
 .coverage
 htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+coverage/
+# Python build artifacts
+pip-wheel-metadata/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Reports / exports
+report_*.json
+*.pdf
+
+# Front-end (future)
+node_modules/
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
