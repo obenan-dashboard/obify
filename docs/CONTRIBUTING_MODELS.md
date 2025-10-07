@@ -18,7 +18,7 @@ Obify uses a centralized configuration approach for all model definitions, prici
 
 The `utils/model_config.py` file contains several key components:
 
-1. **MODEL_PROVIDERS**: Maps model prefixes (e.g., 'gpt-', 'claude-') to their providers (OpenAI, Anthropic, Google)
+1. **MODEL_PROVIDERS**: Maps model prefixes (e.g., 'gpt-', 'claude-', 'openrouter/') to their providers (OpenAI, Anthropic, Google, OpenRouter)
 2. **MODEL_DEFINITIONS**: Contains detailed information about each model, including:
    - `provider`: The API provider (openai, anthropic, google)
    - `display_name`: Human-readable name for the UI
@@ -57,6 +57,16 @@ MODEL_DEFINITIONS['gpt-5'] = {
     'display_name': 'GPT-5',
     'description': 'Next generation large language model',
     'max_tokens': 128000,  # 128k context window
+    'default_max_output_tokens': 4096,
+    'default_temperature': 0.7,
+}
+
+# Example of adding a routed OpenRouter model (OpenAI via OpenRouter)
+MODEL_DEFINITIONS['openrouter/openai/gpt-5'] = {
+    'provider': 'openrouter',
+    'display_name': 'OpenRouter GPT-5',
+    'description': 'GPT-5 accessed through the OpenRouter aggregation layer',
+    'max_tokens': 128000,
     'default_max_output_tokens': 4096,
     'default_temperature': 0.7,
 }
@@ -145,6 +155,16 @@ MODEL_PRICING['llama-3-70b'] = {
    - Adding a new function to call the provider's API (similar to `call_openai`, `call_anthropic_api`, etc.)
    - Adding a new wrapper function (similar to `call_openai`, `call_claude`, etc.)
    - Updating the model calling logic in `test_models`
+
+### Routing Models Through OpenRouter
+
+If the upstream provider is already available on [OpenRouter](https://openrouter.ai/), you can add models without implementing a new API client:
+
+1. Set the model ID using the OpenRouter naming convention (e.g., `openrouter/openai/gpt-4o`).
+2. Set `provider` to `'openrouter'` in `MODEL_DEFINITIONS` and add friendly metadata (display name, defaults).
+3. Add pricing to `MODEL_PRICING` using OpenRouter's published per-token rates.
+4. No additional changes are needed in `model_handler.py`—OpenRouter requests are handled automatically via `call_openrouter_api` when the model ID starts with `openrouter/`.
+5. Ensure `OPENROUTER_API_KEY` is configured via environment variable or `config.json`.
 
 ## Testing Your Changes
 

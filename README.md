@@ -50,12 +50,19 @@ Check out our [demo video](demo.MP4) to see Obify in action.
 - Gemini-2.0-flash
 - Gemini-2.0-flash-lite
 
+### OpenRouter (Routing Layer)
+- openrouter/openai/gpt-4o
+- openrouter/openai/gpt-4o-mini
+- openrouter/openai/gpt-4.1
+- openrouter/anthropic/claude-3.5-sonnet
+- openrouter/deepseek/deepseek-chat
+
 ## 🚀 Getting Started
 
 ### Prerequisites
 
 - Python 3.10+
-- API keys for the models you want to test (OpenAI, Anthropic Claude, and/or Google Gemini)
+- API keys for the models you want to test (OpenAI, Anthropic Claude, Google Gemini, and optionally OpenRouter for routed access to additional providers)
 
 ### Installation
 
@@ -70,21 +77,26 @@ Check out our [demo video](demo.MP4) to see Obify in action.
    pip install -r requirements.txt
    ```
 
-3. **Configure API keys**:
-   
-   Create a `config.json` file in the root directory with the following structure:
-   ```json
-   {
-     "api_keys": {
-       "openai": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-       "anthropic": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-       "google": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-     },
-     "note": ""
-   }
-   ```
-   
-   > **Note:** Replace the placeholders with your actual API keys. The config.json file is included in .gitignore to prevent accidental commits of your API keys.
+3. **Configure API keys (.env)**:
+
+    Create a `.env` file (a `.env.example` is provided):
+    ```ini
+    OPENAI_API_KEY=
+    ANTHROPIC_API_KEY=
+    GEMINI_API_KEY=
+    DEEPSEEK_API_KEY=
+    OPENROUTER_API_KEY=
+    # Optional metadata for OpenRouter headers
+    # SITE_URL=http://localhost:5005
+    # APP_NAME=Obify Model Comparison Platform
+    ```
+
+    Then export them (Linux/macOS):
+    ```bash
+    export $(grep -v '^#' .env | xargs)
+    ```
+
+    > **Note:** The previous `config.json` method for storing API keys is deprecated. Keep keys in environment variables or secret managers. `config.json` (if present) is ignored for credentials.
 
 4. **Run the application**:
    ```bash
@@ -264,25 +276,24 @@ See the [Contributing Guide](docs/CONTRIBUTING_MODELS.md) for details on how to 
    pip install -r requirements.txt
    ```
 
-3. **Configure API keys**:
-   Create a `config.json` file in the root directory with the following structure:
-   ```json
-   {
-       "api_keys": {
-           "openai": "your-openai-api-key",
-           "anthropic": "your-anthropic-api-key",
-           "google": "your-gemini-api-key"
-       },
-       "note": ""
-   }
+3. **Configure API keys** (use `.env`):
+   ```ini
+   OPENAI_API_KEY=your-openai-api-key
+   ANTHROPIC_API_KEY=your-anthropic-api-key
+   GEMINI_API_KEY=your-gemini-api-key
+   DEEPSEEK_API_KEY=your-deepseek-api-key
+   OPENROUTER_API_KEY=your-openrouter-api-key
    ```
-   
-   Alternatively, you can set environment variables:
+   Load them into your shell:
    ```bash
-   export OPENAI_API_KEY="your-openai-api-key"
-   export ANTHROPIC_API_KEY="your-anthropic-api-key"
-   export GEMINI_API_KEY="your-gemini-api-key"
+   export $(grep -v '^#' .env | xargs)
    ```
+   Optional headers for OpenRouter:
+   ```ini
+   SITE_URL=http://localhost:5005
+   APP_NAME=Obify Model Comparison Platform
+   ```
+   `config.json` is no longer required for keys.
 
 4. **Run the application**:
    ```bash
@@ -315,7 +326,7 @@ All model definitions and pricing are centralized in `utils/model_config.py` to 
 ```
 Obify/
 ├── app.py              # Main Flask application
-├── config.json        # API key configuration
+├── .env               # API key configuration (not committed)
 ├── requirements.txt   # Python dependencies
 │
 ├── data/              # Data storage
@@ -348,10 +359,10 @@ This project is licensed under the MIT License.
 
 ## Credits
 
-Developed by Jawad Ali at GSoft Consulting.
+Developed by Jawad Ali 
 
 ---
 
-&copy; 2025 GSoft Consulting
+&copy; 2025 Obenan
 
 MIT License
