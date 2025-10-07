@@ -359,10 +359,10 @@ This project is licensed under the MIT License.
 
 ## Credits
 
-Developed by Jawad Ali at GSoft Consulting.
+Developed by Jawad Ali 
 
 ---
 
-&copy; 2025 GSoft Consulting
+&copy; 2025 Obenan
 
 MIT License
